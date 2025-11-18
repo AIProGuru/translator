@@ -1,0 +1,6 @@
+curl -X POST \
+-F "pdf=@/home/cortexandy/Descargas/pagina-1.png" \
+-F "adapter=openai" \
+-F "prompt=quiero que me traduzcas a ingles el siguiente texto" \
+-F "language=en" \
+http://localhost:5000/api/process-document

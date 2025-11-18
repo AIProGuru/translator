@@ -1,0 +1,2 @@
+curl -X POST http://localhost:5000/api/auth/logout \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImNvcnRleC5hbmR5MjgwOUBnbWFpbC5jb20iLCJuYW1lIjoiQW5kcmVhIENvcnRleiBIZXJyZXJhIiwiaWF0IjoxNzQ1OTU4MjQ5LCJleHAiOjE3NDU5NjE4NDl9.Tglrb8UhMyf5L1EkvJbiTmcZiuOaxcwdTPUPpdQQ418"

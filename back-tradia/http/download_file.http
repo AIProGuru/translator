@@ -1,0 +1,4 @@
+curl -X POST http://localhost:5000/api/download/91 \
+  -H "Content-Type: application/json" \
+  -d '{"type": "pdf"}' \
+  -O -J

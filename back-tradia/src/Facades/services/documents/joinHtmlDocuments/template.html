@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<style>
+			{{{style}}}
+			page {
+				display: block;
+				page-break-before: avoid;
+				page-break-inside: avoid;
+				page-break-after: always;
+				overflow: hidden;
+				box-sizing: border-box;
+                padding: 20px;
+                position: relative;
+			}
+
+			page:first-of-type {
+				page-break-after: avoid;
+			}
+		</style>
+	</head>
+
+	<body>
+		{{{body}}}
+	</body>
+</html>

@@ -1,0 +1,54 @@
+const { Sequelize } = require('sequelize');
+const config = require('../../../shared/config/database.config');
+
+class DatabaseConnection {
+    static instance = null;
+
+    constructor() {
+        if (!DatabaseConnection.instance) {
+            this.sequelize = new Sequelize(config.development);
+            DatabaseConnection.instance = this;
+        }
+        return DatabaseConnection.instance;
+    }
+
+    static getInstance() {
+        if (!DatabaseConnection.instance) {
+            DatabaseConnection.instance = new DatabaseConnection();
+        }
+        return DatabaseConnection.instance;
+    }
+
+    getConnection() {
+        return this.sequelize;
+    }
+
+    async authenticate() {
+        try {
+            await this.sequelize.authenticate();
+            console.log('Conexión a la base de datos establecida correctamente.');
+        } catch (error) {
+            console.error('No se pudo conectar a la base de datos:', error);
+            throw error;
+        }
+    }
+
+    async syncModels() {
+        try {
+            await this.sequelize.sync();
+            console.log('Modelos sincronizados correctamente.');
+        } catch (error) {
+            console.error('Error al sincronizar modelos:', error);
+            throw error;
+        }
+    }
+
+    async close() {
+        if (this.sequelize) {
+            await this.sequelize.close();
+            DatabaseConnection.instance = null;
+        }
+    }
+}
+
+module.exports = DatabaseConnection;

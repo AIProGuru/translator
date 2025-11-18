@@ -1,0 +1,18 @@
+[Unit]
+Description=Backend Of Amigo Translations (Tradia)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/kelvin/projects/back-tradia
+ExecStart=/home/kelvin/.nvm/versions/node/v23.10.0/bin/npm run start
+Restart=always
+RstartSec=3
+User=kelvin
+Environment=PATH=/home/kelvin/.nvm/versions/node/v23.10.0/bin:/home/kelvin/.bun/bin:/home/kelvin/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+Environment=BASE_PATH=/var/lib/tradia
+
+[Install]
+WantedBy=multi-user.target
+
+

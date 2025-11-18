@@ -1,0 +1,23 @@
+  {
+    "logout": "Logout",
+    "drop_pdf_here": "Drag and drop your PDF document here",
+    "click_to_select_file": "or click to select a file",
+    "only_pdf_allowed": "PDF file only",
+    "target_language": "Target Language",
+    "advanced_settings": "Advanced Settings",
+    "ai_adapter": "AI Adapter",
+    "custom_prompts": "Custom Prompts",
+    "self_review_cycles": "Self-review Cycles",
+    "translate_document": "Translate Document",
+    "active_processes": "Active Processes",
+    "previous": "Previous",
+    "next": "Next",
+    "page_of": "Page of",
+    "translation_completed": "Translation Completed",
+    "translation_successful": "Translation successful, you can now download your document",
+    "select_file_type": "Select your file type",
+    "download_document": "Download Document",
+    "back_to_home": "Back to Home"
+  }
+  
+  
