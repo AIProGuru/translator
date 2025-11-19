@@ -4,7 +4,6 @@ const constants = require("../../Api/shared/config/constants");
 const FileManagementService = require("../services/documents/file_management");
 const ProcessFacade = require("../services/process");
 const { parseInt } = require("lodash");
-const { injectSignatureImages } = require("./SignatureRegionHandler");
 
 class TranslationHandler {
     constructor() {
@@ -97,34 +96,8 @@ class TranslationHandler {
             throw new Error("Error: translations results is empty");
         }
 
-        // Inject original signature / mark images into each page HTML
-        const enhancedTranslations = [];
-        for (let index = 0; index < translations.length; index++) {
-            const translation = translations[index];
-            const page = pages[index];
-
-            if (!translation || !translation.html || !page) {
-                enhancedTranslations.push(translation);
-                continue;
-            }
-
-            try {
-                const htmlWithSignatures = await injectSignatureImages(
-                    translation.html,
-                    page,
-                );
-                enhancedTranslations.push({
-                    ...translation,
-                    html: htmlWithSignatures,
-                });
-            } catch (error) {
-                console.error(
-                    "Error injecting signature images into HTML:",
-                    error?.message || error,
-                );
-                enhancedTranslations.push(translation);
-            }
-        }
+        // Do not inject original signature / mark images; use the HTML as returned by the LLM.
+        const enhancedTranslations = translations;
 
         const html_data = enhancedTranslations.map(({ html, page_info }) => {
             return {
