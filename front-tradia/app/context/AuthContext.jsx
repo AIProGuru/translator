@@ -8,6 +8,7 @@ const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true); 
   const { setServerError } = useServerError();
   const router = useRouter();
@@ -46,10 +47,12 @@ export function AuthProvider({ children }) {
 
       const data = await res.json();
       setUser(data.user);
+      setToken(data.token);
       setServerError(false);
     } catch (error) {
       console.error("Error during test login:", error);
       setUser(null);
+      setToken(null);
       setServerError(true);
     }
   };
@@ -70,6 +73,7 @@ export function AuthProvider({ children }) {
       });
 
       setUser(null);
+      setToken(null);
       router.push("/"); 
     } catch (error) {
       console.error("Error al intentar conectar con el backend:", error);
@@ -78,7 +82,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

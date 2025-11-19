@@ -2,12 +2,14 @@
 
 import { BACK_HOST } from "@/lib/constants";
 import { useEffect, useState } from "react";
+import { useAuth } from "../app/context/AuthContext";
 
 export const useProcessStatus = (processId) => {
     const [status, setStatus] = useState("pending");
     const [messages, setMessages] = useState([]);
     const [last_message, setLastMessage] = useState("")
     const [progress, setProgress] = useState(0);
+    const { token } = useAuth();
 
     useEffect(() => {
         if (!processId) return;
@@ -17,7 +19,13 @@ export const useProcessStatus = (processId) => {
         let isActive = true;
 
         const connect = () => {
-            const eventSource = new EventSource(`${BACK_HOST}/api/process-status/${processId}`, {
+            const url = token
+                ? `${BACK_HOST}/api/process-status/${processId}?token=${encodeURIComponent(
+                      token
+                  )}`
+                : `${BACK_HOST}/api/process-status/${processId}`;
+
+            const eventSource = new EventSource(url, {
                 withCredentials: true,
             });
 
@@ -78,7 +86,7 @@ export const useProcessStatus = (processId) => {
             isActive = false;
             cleanup();
         };
-    }, [processId, status]);
+    }, [processId, status, token]);
 
     return { status, messages, progress, last_message };
 };

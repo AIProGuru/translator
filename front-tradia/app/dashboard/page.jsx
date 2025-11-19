@@ -42,7 +42,7 @@ export default function Home() {
 
     const fetchProcesses = async () => {
         try {
-            const response = await fetch(`${BACK_HOST}/api/processes`, {
+            const response = await safeFetch(`${BACK_HOST}/api/processes`, {
                 method: "GET",
                 credentials: "include",
             });

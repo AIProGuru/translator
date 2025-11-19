@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { BACK_HOST } from "@/lib/constants";
 import ConfirmModal from "../components/ConfirmModal";
+import { useAuth } from "../app/context/AuthContext";
 
 const ITEMS_PER_PAGE = 6;
 
 export default function ProcessList({ processes }) {
   const router = useRouter();
+  const { token } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
   const [allProcesses, setAllProcesses] = useState(processes);
   const [modalOpen, setModalOpen] = useState(false);
@@ -49,6 +51,12 @@ export default function ProcessList({ processes }) {
     try {
       await fetch(`${BACK_HOST}/api/processes/${processToDelete}`, {
         method: "DELETE",
+        credentials: "include",
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : {},
       });
       setAllProcesses((prev) => prev.filter((p) => p.id !== processToDelete));
     } catch (error) {
