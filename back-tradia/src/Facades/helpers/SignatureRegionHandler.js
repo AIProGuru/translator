@@ -125,9 +125,9 @@ async function injectSignatureImages(html, page) {
 				const widthPercent = relW * 100;
 				const heightPercent = relH * 100;
 
-				// Stretch the cropped region to fully occupy the placeholder box so that
-				// the visual size matches the original region as closely as possible.
-				const imgTag = `<img class="maria-signature" src="${dataUrl}" style="position:absolute; left:${leftPercent}%; top:${topPercent}%; width:${widthPercent}%; height:${heightPercent}%;"/>`;
+				// Use relative position for alignment, but preserve the original
+				// cropped size in pixels so the visual size matches the source.
+				const imgTag = `<img class="maria-signature" src="${dataUrl}" style="position:absolute; left:${leftPercent}%; top:${topPercent}%; width:${safeWidth}px; height:${safeHeight}px;"/>`;
 
 				return { fullMatch, replacement: imgTag };
 			} catch (error) {
