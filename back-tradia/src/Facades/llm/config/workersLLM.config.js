@@ -9,7 +9,7 @@ module.exports = [
 		name: "traductor_html",
 		description:
 			"Traduce la imagen que se le pone como input respetando el formato y dando una salida HTML",
-		prompt: "1.1_traductor_prompt.md",
+		prompt: "1.0_traductor_prompt.md",
 		use_history: true,
 		on_init: async (
 			last_response,
