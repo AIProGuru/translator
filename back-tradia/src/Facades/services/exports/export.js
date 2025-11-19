@@ -7,10 +7,13 @@ class Export {
 		html: z.string(),
 		process: z.any(), // process instance sequealize
 		process_dir: z.string(),
-		dimensions: z.object({
-			width: z.number(), // px
-			height: z.number(), // px
-		}),
+		// dimensions are optional; if not provided we'll fall back to a default format (A4)
+		dimensions: z
+			.object({
+				width: z.number(), // px
+				height: z.number(), // px
+			})
+			.optional(),
 	});
 	constructor(input) {
 		this.config = Export.CONSTRUCTOR_SCHEMA.parse(input);

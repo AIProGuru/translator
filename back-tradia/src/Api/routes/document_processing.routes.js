@@ -183,7 +183,13 @@ router.post("/download/:id", requireAuth, async (req, res) => {
 
 		const process = await processFacade.getProcessById(processId, userId);
 		let output_html = process?.dataValues?.html;
-		let dimensions = process?.dataValues?.pages_info[0].dimensions; // Note: las dimensiones se basan en las de la primera página
+
+		// Make access to pages_info / dimensions safe to avoid runtime errors
+		const pagesInfo = process?.dataValues?.pages_info;
+		let dimensions =
+			Array.isArray(pagesInfo) && pagesInfo.length > 0 && pagesInfo[0]
+				? pagesInfo[0].dimensions
+				: undefined; // Export will default to A4 if dimensions are not provided
 
 		const processDir = fileManagement.createProcessDirectory(processId);
 		let filePath = "";
@@ -216,8 +222,10 @@ router.post("/download/:id", requireAuth, async (req, res) => {
 			return res.status(500).json({ error: "Error download file" });
 		return res.sendFile(filePath);
 	} catch (error) {
+		console.error("Error in /download route:", error);
 		res.status(500).json({
 			error: "Error download file",
+			details: error.message,
 		});
 	}
 });
