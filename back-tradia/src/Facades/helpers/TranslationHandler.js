@@ -76,17 +76,12 @@ class TranslationHandler {
             throw new Error("Pages to translate not found");
         }
 
-        const hours = 10;
+        const hours = 10
         const translations = await Promise.race([
             this._llm.run(pages),
             new Promise((_, reject) =>
                 setTimeout(
-                    () =>
-                        reject(
-                            new Error(
-                                "Timeout Error when translations pages width LLM",
-                            ),
-                        ),
+                    () => reject(new Error("Timeout Error when translations pages width LLM")),
                     hours * 60 * 60 * 1000,
                 ),
             ),
@@ -95,11 +90,7 @@ class TranslationHandler {
         if (!translations || translations.length === 0) {
             throw new Error("Error: translations results is empty");
         }
-
-        // Do not inject original signature / mark images; use the HTML as returned by the LLM.
-        const enhancedTranslations = translations;
-
-        const html_data = enhancedTranslations.map(({ html, page_info }) => {
+        const html_data = translations.map(({ html, page_info }) => {
             return {
                 html,
                 html_info: {
@@ -115,22 +106,18 @@ class TranslationHandler {
         }
 
         const pages_info = pages.map(({ page_info }) => page_info);
-        await this._processFacade.updateProcess(
-            process.id,
-            {
-                status: constants.PROCESS_STATUS.TRANSLATING,
-                message: "Translations done",
-                progress: 60,
-                config: {
-                    adapter: config.adapter,
-                    language: config.language,
-                },
-                html: mergedHtml,
-                pages_info,
+        await this._processFacade.updateProcess(process.id, {
+            status: constants.PROCESS_STATUS.TRANSLATING,
+            message: "Translations done",
+            progress: 60,
+            config: {
+                adapter: config.adapter,
+                language: config.language,
             },
-            userId,
-        );
-        return enhancedTranslations;
+            html: mergedHtml,
+            pages_info,
+        },userId);
+        return translations;
     }
 
     async _handleProcessError(processId, error, userId) {

@@ -5,19 +5,19 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<style>
 			{{{style}}}
-			/* Each <page> element becomes its own printed page */
 			page {
 				display: block;
-				page-break-before: always;
-				page-break-after: always;
+				page-break-before: avoid;
 				page-break-inside: avoid;
+				page-break-after: always;
 				overflow: hidden;
 				box-sizing: border-box;
-				padding: 20px;
-				position: relative;
+                padding: 20px;
+                position: relative;
 			}
-			body {
-				margin: 0;
+
+			page:first-of-type {
+				page-break-after: avoid;
 			}
 		</style>
 	</head>

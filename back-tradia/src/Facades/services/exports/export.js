@@ -7,13 +7,10 @@ class Export {
 		html: z.string(),
 		process: z.any(), // process instance sequealize
 		process_dir: z.string(),
-		// dimensions are optional; if not provided we'll fall back to a default format (A4)
-		dimensions: z
-			.object({
-				width: z.number(), // px
-				height: z.number(), // px
-			})
-			.optional(),
+		dimensions: z.object({
+			width: z.number(), // px
+			height: z.number(), // px
+		}),
 	});
 	constructor(input) {
 		this.config = Export.CONSTRUCTOR_SCHEMA.parse(input);
@@ -22,12 +19,7 @@ class Export {
 		try {
 			const FILE_NAME = "export_pdf.pdf";
 			const file_path = path.join(this.config.process_dir, FILE_NAME);
-			// When running as root (common on some servers/containers), Chromium must be
-			// started with no-sandbox flags or it will fail to launch.
-			const browser = await puppeteer.launch({
-				args: ["--no-sandbox", "--disable-setuid-sandbox"],
-				headless: "new",
-			});
+			const browser = await puppeteer.launch();
 			const page = await browser.newPage();
 			await page.setContent(this.config.html);
 			let options = {
