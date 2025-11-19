@@ -118,7 +118,14 @@ async function injectSignatureImages(html, page) {
 				const base64 = buffer.toString("base64");
 				const dataUrl = `data:image/png;base64,${base64}`;
 
-				const imgTag = `<img class="maria-signature" src="${dataUrl}" style="position:absolute; left:${safeLeft}px; top:${safeTop}px; width:${safeWidth}px; height:${safeHeight}px;" />`;
+				// Position the image using the same relative coordinates used for cropping,
+				// so it stays aligned even if the page is scaled in HTML/PDF.
+				const leftPercent = relX * 100;
+				const topPercent = relY * 100;
+				const widthPercent = relW * 100;
+				const heightPercent = relH * 100;
+
+				const imgTag = `<img class="maria-signature" src="${dataUrl}" style="position:absolute; left:${leftPercent}%; top:${topPercent}%; width:${widthPercent}%; height:${heightPercent}%; object-fit:contain;" />`;
 
 				return { fullMatch, replacement: imgTag };
 			} catch (error) {
