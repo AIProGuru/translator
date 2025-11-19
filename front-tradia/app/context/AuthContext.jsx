@@ -14,6 +14,7 @@ export function AuthProvider({ children }) {
   
 
   useEffect(() => {
+    console.log("BACK_HOST", BACK_HOST);
     fetch(`${BACK_HOST}/api/auth/me`, {
       credentials: "include",
     })
@@ -32,21 +33,24 @@ export function AuthProvider({ children }) {
       });
   }, []);
 
-
   const login = async () => {
     try {
-      const res = await fetch(`${BACK_HOST}/api/auth/ping`, {
-        method: "GET",
+      const res = await fetch(`${BACK_HOST}/api/auth/test-login`, {
+        method: "POST",
+        credentials: "include",
       });
 
       if (!res.ok) {
-        throw new Error("Servidor no responde");
+        throw new Error("Test login failed");
       }
 
-      window.location.href = `${BACK_HOST}/api/auth/google`;
+      const data = await res.json();
+      setUser(data.user);
+      setServerError(false);
     } catch (error) {
-      console.error("Error al intentar conectar con el backend:", error);
-      setServerError(true); 
+      console.error("Error during test login:", error);
+      setUser(null);
+      setServerError(true);
     }
   };
 
