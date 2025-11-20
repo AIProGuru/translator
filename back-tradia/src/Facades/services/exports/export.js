@@ -26,17 +26,34 @@ class Export {
 				headless: "new",
 			});
 			const page = await browser.newPage();
-			await page.setContent(this.config.html);
-			let options = {
-				path: file_path,
-				printBackground: true,
-			};
-			if (this.config.dimensions) {
-				options = { ...options, ...this.config.dimensions };
-			} else {
-				options.format = "A4";
+
+			// Ensure the viewport matches the original page pixel dimensions.
+			const { width, height } = this.config.dimensions || {};
+			if (width && height) {
+				await page.setViewport({
+					width,
+					height,
+					deviceScaleFactor: 1,
+				});
 			}
-			await page.pdf(options);
+
+			await page.setContent(this.config.html, { waitUntil: "networkidle0" });
+
+			// Make the PDF page the same size as the original page (in CSS pixels).
+			const pdfOptions = width && height
+				? {
+						path: file_path,
+						printBackground: true,
+						width: `${width}px`,
+						height: `${height}px`,
+				  }
+				: {
+						path: file_path,
+						printBackground: true,
+						format: "A4",
+				  };
+
+			await page.pdf(pdfOptions);
 			browser.close();
 			return file_path;
 		} catch (error) {

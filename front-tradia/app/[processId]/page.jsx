@@ -73,6 +73,11 @@ export default function ProcessPage({ params }) {
     }
   };
 
+  const handlePreview = () => {
+    // Open a preview page showing original and translated PDFs side by side
+    router.push(`/${processId}/preview`);
+  };
+
   return (
     <>
       <ProtectedRoute>
@@ -224,7 +229,7 @@ export default function ProcessPage({ params }) {
                   </div>
                 </div>
 
-                {/* Botón */}
+                {/* Botones */}
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -238,6 +243,15 @@ export default function ProcessPage({ params }) {
                 >
                   {isDownloading ? "Downloading..." : "Download Document"}
                 </motion.button>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={handlePreview}
+                    className="text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Preview original vs translated PDF
+                  </button>
+                </div>
                 {showServerErrorModal && (
                   <ServerErrorModal
                     onClose={() => setShowServerErrorModal(false)}

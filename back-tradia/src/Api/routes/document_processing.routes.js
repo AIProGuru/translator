@@ -222,4 +222,70 @@ router.post("/download/:id", requireAuth, async (req, res) => {
 	}
 });
 
+// ---------- Preview Endpoints ----------
+
+// Preview original (sanitized) PDF generated from the upload
+router.get("/preview/original/:id", requireAuth, async (req, res) => {
+	try {
+		const processId = req.params.id;
+		const userId = req.user.id;
+
+		// Ensure the process exists and belongs to the user
+		await processFacade.getProcessById(processId, userId);
+
+		const processDir = fileManagement.createProcessDirectory(processId);
+		const files = await fs.promises.readdir(processDir);
+		const pdfFile = files.find((f) => f.toLowerCase().endsWith(".pdf"));
+
+		if (!pdfFile) {
+			return res.status(404).json({
+				error: "Original PDF for this process not found",
+			});
+		}
+
+		const pdfPath = path.join(processDir, pdfFile);
+		return res.sendFile(pdfPath);
+	} catch (error) {
+		res.status(500).json({
+			error: "Error previewing original PDF",
+		});
+	}
+});
+
+// Preview translated PDF (same as download pdf, but via GET and always PDF)
+router.get("/preview/translated/:id", requireAuth, async (req, res) => {
+	try {
+		const processId = req.params.id;
+		const userId = req.user.id;
+
+		const process = await processFacade.getProcessById(processId, userId);
+		let output_html = process?.dataValues?.html;
+		let dimensions = process?.dataValues?.pages_info[0].dimensions;
+
+		const processDir = fileManagement.createProcessDirectory(processId);
+		let filePath = "";
+		const _exports = new Export({
+			html: output_html,
+			process,
+			process_dir: processDir,
+			dimensions,
+		});
+		if (!output_html) {
+			return res.status(404).json({
+				error: "Result of this process not found",
+			});
+		}
+
+		filePath = await _exports.toPDF();
+
+		if (!filePath)
+			return res.status(500).json({ error: "Error generating preview PDF" });
+		return res.sendFile(filePath);
+	} catch (error) {
+		res.status(500).json({
+			error: "Error previewing translated PDF",
+		});
+	}
+});
+
 module.exports = router;
