@@ -32,9 +32,9 @@ async function injectSignatureImages(html, page) {
 	const { width: pageWidth, height: pageHeight } = page.page_info.dimensions;
 
 	// Match any tag that contains the "maria-signature" or "maria-image" class.
-	// We keep the whole original match string so we can safely replace it later.
+	// Supports both <div ...></div> and self-closing <div ... /> forms.
 	const placeholderRegex =
-		/<([a-zA-Z0-9]+)([^>]*class=["'][^"']*maria-(?:signature|image)[^"']*["'][^>]*)>([\s\S]*?)<\/\1>/gi;
+		/<([a-zA-Z0-9]+)([^>]*class=["'][^"']*maria-(?:signature|image)[^"']*["'][^>]*)(?:>([\s\S]*?)<\/\1>|\/>)/gi;
 
 	const placeholders = [];
 
