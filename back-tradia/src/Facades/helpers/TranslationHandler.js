@@ -4,6 +4,7 @@ const constants = require("../../Api/shared/config/constants");
 const FileManagementService = require("../services/documents/file_management");
 const ProcessFacade = require("../services/process");
 const { parseInt } = require("lodash");
+const { injectSignatureImages } = require("./SignatureRegionHandler");
 
 class TranslationHandler {
     constructor() {
@@ -90,7 +91,38 @@ class TranslationHandler {
         if (!translations || translations.length === 0) {
             throw new Error("Error: translations results is empty");
         }
-        const html_data = translations.map(({ html, page_info }) => {
+
+        // Inject original image regions (logos, signatures, handwritten blocks, etc.)
+        // into the HTML wherever the LLM placed placeholder divs (maria-signature / maria-image).
+        const enhancedTranslations = [];
+        for (let index = 0; index < translations.length; index++) {
+            const translation = translations[index];
+            const page = pages[index];
+
+            if (!translation || !translation.html || !page) {
+                enhancedTranslations.push(translation);
+                continue;
+            }
+
+            try {
+                const htmlWithImages = await injectSignatureImages(
+                    translation.html,
+                    page,
+                );
+                enhancedTranslations.push({
+                    ...translation,
+                    html: htmlWithImages,
+                });
+            } catch (error) {
+                console.error(
+                    "Error injecting original image regions into HTML:",
+                    error?.message || error,
+                );
+                enhancedTranslations.push(translation);
+            }
+        }
+
+        const html_data = enhancedTranslations.map(({ html, page_info }) => {
             return {
                 html,
                 html_info: {
@@ -117,7 +149,7 @@ class TranslationHandler {
             html: mergedHtml,
             pages_info,
         },userId);
-        return translations;
+        return enhancedTranslations;
     }
 
     async _handleProcessError(processId, error, userId) {

@@ -31,10 +31,10 @@ async function injectSignatureImages(html, page) {
 
 	const { width: pageWidth, height: pageHeight } = page.page_info.dimensions;
 
-	// Match any tag that contains the "maria-signature" class.
+	// Match any tag that contains the "maria-signature" or "maria-image" class.
 	// We keep the whole original match string so we can safely replace it later.
 	const placeholderRegex =
-		/<([a-zA-Z0-9]+)([^>]*class=["'][^"']*maria-signature[^"']*["'][^>]*)>([\s\S]*?)<\/\1>/gi;
+		/<([a-zA-Z0-9]+)([^>]*class=["'][^"']*maria-(?:signature|image)[^"']*["'][^>]*)>([\s\S]*?)<\/\1>/gi;
 
 	const placeholders = [];
 
@@ -53,10 +53,51 @@ async function injectSignatureImages(html, page) {
 			return Number.isFinite(value) ? value : null;
 		}
 
-		const relX = extractAttr("data-x");
-		const relY = extractAttr("data-y");
-		const relW = extractAttr("data-width");
-		const relH = extractAttr("data-height");
+		// Primary source: relative coordinates via data-* attributes (0–1)
+		let relX = extractAttr("data-x");
+		let relY = extractAttr("data-y");
+		let relW = extractAttr("data-width");
+		let relH = extractAttr("data-height");
+
+		// Fallback: allow absolute pixel coordinates via inline style
+		// style="position:absolute; left:100px; top:200px; width:150px; height:80px; ..."
+		if (
+			(relX === null || relY === null || relW === null || relH === null) &&
+			pageWidth != null &&
+			pageHeight != null
+		) {
+			const styleMatch = attrs.match(/style=["']([^"']*)["']/i);
+			if (styleMatch) {
+				const style = styleMatch[1];
+				function extractPx(prop) {
+					const re = new RegExp(
+						`${prop}\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)px`,
+						"i",
+					);
+					const m = style.match(re);
+					if (!m) return null;
+					const v = parseFloat(m[1]);
+					return Number.isFinite(v) ? v : null;
+				}
+
+				const leftPx = extractPx("left");
+				const topPx = extractPx("top");
+				const widthPx = extractPx("width");
+				const heightPx = extractPx("height");
+
+				if (
+					leftPx != null &&
+					topPx != null &&
+					widthPx != null &&
+					heightPx != null
+				) {
+					relX = leftPx / pageWidth;
+					relY = topPx / pageHeight;
+					relW = widthPx / pageWidth;
+					relH = heightPx / pageHeight;
+				}
+			}
+		}
 
 		if (
 			relX === null ||
