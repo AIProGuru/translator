@@ -3,12 +3,23 @@
 import { use } from "react";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import { BACK_HOST } from "@/lib/constants";
+import { useAuth } from "../../context/AuthContext";
 
 export default function PreviewPage({ params }) {
   const { processId } = use(params);
+  const { token } = useAuth();
 
-  const originalUrl = `${BACK_HOST}/api/preview/original/${processId}`;
-  const translatedUrl = `${BACK_HOST}/api/preview/translated/${processId}`;
+  const originalUrl = token
+    ? `${BACK_HOST}/api/preview/original/${processId}?token=${encodeURIComponent(
+        token,
+      )}`
+    : `${BACK_HOST}/api/preview/original/${processId}`;
+
+  const translatedUrl = token
+    ? `${BACK_HOST}/api/preview/translated/${processId}?token=${encodeURIComponent(
+        token,
+      )}`
+    : `${BACK_HOST}/api/preview/translated/${processId}`;
 
   return (
     <ProtectedRoute>
