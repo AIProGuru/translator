@@ -2,6 +2,7 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const htmlToDocx = require("html-to-docx");
+const sharp = require("sharp");
 const DocumentProcessingFacade = require("../../Facades/services/documents");
 const FileManagementService = require("../../Facades/services/documents/file_management");
 const ProcessFacade = require("../../Facades/services/process");
@@ -16,6 +17,56 @@ const facade = new DocumentProcessingFacade();
 
 const processFacade = new ProcessFacade();
 const fileManagement = new FileManagementService();
+
+// Helper to apply manual image patches (cropped from original PDF) into translated HTML
+function applyManualPatchesToHtml(html, process) {
+	if (!html) return html;
+	const config = process?.dataValues?.config || {};
+	const patches = config.manualPatches || [];
+	if (!Array.isArray(patches) || patches.length === 0) return html;
+
+	const pagesInfo = process?.dataValues?.pages_info || [];
+
+	let resultHtml = html;
+
+	for (const patch of patches) {
+		const { page, target, dataUrl } = patch;
+		if (!page || !target || !dataUrl) continue;
+
+		const marker = `<page id="page-${page}">`;
+		if (!resultHtml.includes(marker)) continue;
+
+		// Resolve target coordinates: support both absolute pixels and relative (0–1)
+		let { x, y, width, height } = target;
+
+		const pageInfo =
+			Array.isArray(pagesInfo) &&
+			pagesInfo.find(
+				(p) =>
+					p.pageNumber === page || p.page_number === page,
+			);
+
+		if (pageInfo && pageInfo.dimensions) {
+			const pageW = pageInfo.dimensions.width;
+			const pageH = pageInfo.dimensions.height;
+
+			if (x <= 1 && width <= 1) {
+				x = x * pageW;
+				width = width * pageW;
+			}
+			if (y <= 1 && height <= 1) {
+				y = y * pageH;
+				height = height * pageH;
+			}
+		}
+
+		const imgTag = `<img src="${dataUrl}" style="position:absolute; left:${x}px; top:${y}px; width:${width}px; height:${height}px;" />`;
+
+		resultHtml = resultHtml.replace(marker, `${marker}\n${imgTag}`);
+	}
+
+	return resultHtml;
+}
 
 router.post("/process-document", requireAuth, async (req, res) => {
 	facade.getUploadMiddleware()(req, res, async (err) => {
@@ -183,6 +234,7 @@ router.post("/download/:id", requireAuth, async (req, res) => {
 
 		const process = await processFacade.getProcessById(processId, userId);
 		let output_html = process?.dataValues?.html;
+		output_html = applyManualPatchesToHtml(output_html, process);
 		let dimensions = process?.dataValues?.pages_info[0].dimensions; // Note: las dimensiones se basan en las de la primera página
 
 		const processDir = fileManagement.createProcessDirectory(processId);
@@ -260,6 +312,7 @@ router.get("/preview/translated/:id", requireAuth, async (req, res) => {
 
 		const process = await processFacade.getProcessById(processId, userId);
 		let output_html = process?.dataValues?.html;
+		output_html = applyManualPatchesToHtml(output_html, process);
 		let dimensions = process?.dataValues?.pages_info[0].dimensions;
 
 		const processDir = fileManagement.createProcessDirectory(processId);
@@ -284,6 +337,138 @@ router.get("/preview/translated/:id", requireAuth, async (req, res) => {
 	} catch (error) {
 		res.status(500).json({
 			error: "Error previewing translated PDF",
+		});
+	}
+});
+
+// Serve original page image (PNG) for a given process and page number
+router.get(
+	"/preview/original-image/:id/:page",
+	requireAuth,
+	async (req, res) => {
+		try {
+			const processId = req.params.id;
+			const pageNumber = parseInt(req.params.page, 10) || 1;
+			const userId = req.user.id;
+
+			// Ensure the process exists and belongs to the user
+			await processFacade.getProcessById(processId, userId);
+
+			const processDir = fileManagement.createProcessDirectory(processId);
+			const images = await fileManagement.getImagesFromPath(processDir);
+			const pageEntry = images.find(
+				(img) =>
+					img.page_info.pageNumber === pageNumber ||
+					img.page_info.page_number === pageNumber,
+			);
+
+			if (!pageEntry) {
+				return res.status(404).json({
+					error: `Original page image for page ${pageNumber} not found`,
+				});
+			}
+
+			return res.sendFile(pageEntry.image.path);
+		} catch (error) {
+			console.error("Error serving original page image:", error);
+			res.status(500).json({
+				error: "Error serving original page image",
+			});
+		}
+	},
+);
+
+// ---------- Manual image patch API ----------
+
+// Body: { page, source: { x, y, width, height }, target: { x, y, width, height } }
+router.post("/processes/:id/manual-image", requireAuth, async (req, res) => {
+	try {
+		const processId = req.params.id;
+		const userId = req.user.id;
+		const { page, source, target } = req.body || {};
+
+		if (
+			!page ||
+			!source ||
+			typeof source.x !== "number" ||
+			typeof source.y !== "number" ||
+			typeof source.width !== "number" ||
+			typeof source.height !== "number" ||
+			(source &&
+				(typeof source.x !== "number" ||
+					typeof source.y !== "number" ||
+					typeof source.width !== "number" ||
+					typeof source.height !== "number"))
+		) {
+			return res.status(400).json({
+				error:
+					"Invalid body. Expected { page, source: { x, y, width, height }, target?: { x, y, width, height } }",
+			});
+		}
+
+		const process = await processFacade.getProcessById(processId, userId);
+		const processDir = fileManagement.createProcessDirectory(processId);
+
+		// Find the original page image corresponding to this page number
+		const images = await fileManagement.getImagesFromPath(processDir);
+		const pageEntry = images.find(
+			(img) => img.page_info.pageNumber === page || img.page_info.page_number === page,
+		);
+
+		if (!pageEntry) {
+			return res.status(404).json({
+				error: `Original page image for page ${page} not found`,
+			});
+		}
+
+		// Crop the source region from the original page image
+		const buffer = await sharp(pageEntry.image.path)
+			.extract({
+				left: Math.max(0, Math.round(source.x)),
+				top: Math.max(0, Math.round(source.y)),
+				width: Math.max(1, Math.round(source.width)),
+				height: Math.max(1, Math.round(source.height)),
+			})
+			.png()
+			.toBuffer();
+
+		const base64 = buffer.toString("base64");
+		const dataUrl = `data:image/png;base64,${base64}`;
+
+		// Update process.config.manualPatches
+		const config = process.dataValues.config || {};
+		const patches = Array.isArray(config.manualPatches)
+			? config.manualPatches
+			: [];
+
+		const targetBox = target && typeof target.x === "number" ? target : source;
+
+		const patch = {
+			id: patches.length + 1,
+			page,
+			target: {
+				x: targetBox.x,
+				y: targetBox.y,
+				width: targetBox.width,
+				height: targetBox.height,
+			},
+			dataUrl,
+		};
+
+		patches.push(patch);
+		config.manualPatches = patches;
+
+		await processFacade.updateProcess(processId, { config }, userId);
+
+		return res.json({
+			success: true,
+			patch,
+			manualPatches: patches,
+		});
+	} catch (error) {
+		console.error("Error creating manual image patch:", error);
+		res.status(500).json({
+			error: "Error creating manual image patch",
 		});
 	}
 });
