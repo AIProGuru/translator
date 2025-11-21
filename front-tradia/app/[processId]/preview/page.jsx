@@ -30,15 +30,16 @@ export default function PreviewPage({ params }) {
   const [selection, setSelection] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const startRef = useRef({ x: 0, y: 0 });
-  const containerRef = useRef(null);
+  const originalContainerRef = useRef(null);
   const [message, setMessage] = useState("");
   const [translatedKey, setTranslatedKey] = useState(0);
 
   const handleMouseDown = (e) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
+    if (!originalContainerRef.current) return;
+    const rect = originalContainerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    console.log("[Preview] mouseDown original:", { x, y, rect });
     startRef.current = { x, y };
     setSelection({ x, y, width: 0, height: 0 });
     setIsDragging(true);
@@ -46,34 +47,43 @@ export default function PreviewPage({ params }) {
   };
 
   const handleMouseMove = (e) => {
-    if (!isDragging || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
+    if (!isDragging || !originalContainerRef.current) return;
+    const rect = originalContainerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const start = startRef.current;
     const width = x - start.x;
     const height = y - start.y;
-    setSelection({
+    const nextSelection = {
       x: width < 0 ? x : start.x,
       y: height < 0 ? y : start.y,
       width: Math.abs(width),
       height: Math.abs(height),
-    });
+    };
+    setSelection(nextSelection);
+    // Debug current selection while dragging
+    // (this will spam the console while moving, but helpful for now)
+    console.debug("[Preview] mouseMove selection:", nextSelection);
   };
 
   const handleMouseUp = async () => {
-    if (!isDragging || !selection || !containerRef.current) return;
+    if (!isDragging || !selection || !originalContainerRef.current) return;
     setIsDragging(false);
 
     try {
-      const rect = containerRef.current.getBoundingClientRect();
-      // Normalize to 0–1 relative coordinates
+      // Normalize to 0–1 relative coordinates within original container
+      const rect = originalContainerRef.current.getBoundingClientRect();
       const source = {
         x: selection.x / rect.width,
         y: selection.y / rect.height,
         width: selection.width / rect.width,
         height: selection.height / rect.height,
       };
+      console.log("[Preview] mouseUp normalized source:", {
+        selection,
+        rect,
+        source,
+      });
 
       const body = {
         page: 1,
@@ -94,15 +104,21 @@ export default function PreviewPage({ params }) {
       );
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Error creating manual image patch");
+        const errJson = await res.json().catch(() => ({}));
+        console.error(
+          "[Preview] manual-image response not OK:",
+          res.status,
+          errJson,
+        );
+        throw new Error(errJson.error || "Error creating manual image patch");
       }
 
+      console.log("[Preview] manual-image patch saved successfully");
+      setSelection(null);
       setMessage(
-        "Patch saved. Reloading translated preview to include the new image...",
+        "Patch applied. Reloading translated preview to include the new image...",
       );
-      // Force iframe reload
-      setTranslatedKey((k) => k + 1);
+      setTranslatedKey((k) => k + 1); // Force iframe reload
     } catch (error) {
       console.error("Error saving manual image patch:", error);
       setMessage(
@@ -130,10 +146,10 @@ export default function PreviewPage({ params }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[80vh]">
           <div className="border rounded-lg overflow-hidden flex flex-col">
             <div className="bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700">
-              Original (page 1) – drag to select a region
+              Original (page 1) – drag to select a region (applied immediately)
             </div>
             <div
-              ref={containerRef}
+              ref={originalContainerRef}
               className="relative flex-1 w-full h-full bg-gray-50 cursor-crosshair"
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
@@ -161,17 +177,20 @@ export default function PreviewPage({ params }) {
             <div className="bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700">
               Translated PDF (auto‑reloaded after each patch)
             </div>
-            <iframe
-              key={translatedKey}
-              src={translatedPdfUrl}
-              className="flex-1 w-full h-full"
-              title="Translated PDF preview"
-            />
+            <div className="relative flex-1 w-full h-full bg-gray-50">
+              <iframe
+                key={translatedKey}
+                src={translatedPdfUrl}
+                className="absolute inset-0 w-full h-full"
+                title="Translated PDF preview"
+              />
+            </div>
           </div>
         </div>
         <div className="mt-4 text-xs text-gray-500">
-          Note: currently this tool applies patches to page 1 only and places
-          them at the same relative position on the translated page.
+          Note: currently this tool applies patches to page 1 only. Each selection
+          is applied immediately to the translated PDF at the same relative
+          position.
         </div>
       </main>
     </ProtectedRoute>

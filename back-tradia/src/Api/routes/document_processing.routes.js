@@ -23,18 +23,59 @@ function applyManualPatchesToHtml(html, process) {
 	if (!html) return html;
 	const config = process?.dataValues?.config || {};
 	const patches = config.manualPatches || [];
-	if (!Array.isArray(patches) || patches.length === 0) return html;
+
+	if (!Array.isArray(patches) || patches.length === 0) {
+		console.debug(
+			"[Patches] No manualPatches to apply for process",
+			process?.id,
+		);
+		return html;
+	}
 
 	const pagesInfo = process?.dataValues?.pages_info || [];
+
+	// High‑level debug info to see what we're working with
+	try {
+		console.debug(
+			`[Patches] Applying ${patches.length} patches to process ${
+				process?.id
+			}. HTML length=${html.length}`,
+		);
+		console.debug(
+			"[Patches] HTML head (first 400 chars):",
+			html.slice(0, 400),
+		);
+		console.debug(
+			"[Patches] pages_info:",
+			JSON.stringify(pagesInfo, null, 2),
+		);
+		console.debug(
+			"[Patches] manualPatches:",
+			JSON.stringify(patches, null, 2),
+		);
+	} catch (e) {
+		console.warn("[Patches] Failed to log debug info:", e?.message);
+	}
 
 	let resultHtml = html;
 
 	for (const patch of patches) {
 		const { page, target, dataUrl } = patch;
-		if (!page || !target || !dataUrl) continue;
+		if (!page || !target || !dataUrl) {
+			console.warn(
+				"[Patches] Skipping patch with missing fields:",
+				patch,
+			);
+			continue;
+		}
 
 		const marker = `<page id="page-${page}">`;
-		if (!resultHtml.includes(marker)) continue;
+		if (!resultHtml.includes(marker)) {
+			console.warn(
+				`[Patches] Marker ${marker} not found in HTML for process ${process?.id}; patch will be skipped`,
+			);
+			continue;
+		}
 
 		// Resolve target coordinates: support both absolute pixels and relative (0–1)
 		let { x, y, width, height } = target;
@@ -59,6 +100,11 @@ function applyManualPatchesToHtml(html, process) {
 				height = height * pageH;
 			}
 		}
+
+		console.debug(
+			"[Patches] Injecting patch",
+			JSON.stringify({ page, x, y, width, height }),
+		);
 
 		const imgTag = `<img src="${dataUrl}" style="position:absolute; left:${x}px; top:${y}px; width:${width}px; height:${height}px;" />`;
 
