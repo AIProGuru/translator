@@ -106,7 +106,8 @@ function applyManualPatchesToHtml(html, process) {
 			JSON.stringify({ page, x, y, width, height }),
 		);
 
-		const imgTag = `<img src="${dataUrl}" style="position:absolute; left:${x}px; top:${y}px; width:${width}px; height:${height}px;" />`;
+		// High z-index and a visible border so we can clearly see the patched area
+		const imgTag = `<img src="${dataUrl}" style="position:absolute; left:${x}px; top:${y}px; width:${width}px; height:${height}px; z-index:9999; border:2px solid red; pointer-events:none;" />`;
 
 		resultHtml = resultHtml.replace(marker, `${marker}\n${imgTag}`);
 	}
