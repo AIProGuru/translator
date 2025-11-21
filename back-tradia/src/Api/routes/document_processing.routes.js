@@ -77,29 +77,8 @@ function applyManualPatchesToHtml(html, process) {
 			continue;
 		}
 
-		// Resolve target coordinates: support both absolute pixels and relative (0–1)
+		// Target coordinates are expected to be absolute pixels (already scaled on save)
 		let { x, y, width, height } = target;
-
-		const pageInfo =
-			Array.isArray(pagesInfo) &&
-			pagesInfo.find(
-				(p) =>
-					p.pageNumber === page || p.page_number === page,
-			);
-
-		if (pageInfo && pageInfo.dimensions) {
-			const pageW = pageInfo.dimensions.width;
-			const pageH = pageInfo.dimensions.height;
-
-			if (x <= 1 && width <= 1) {
-				x = x * pageW;
-				width = width * pageW;
-			}
-			if (y <= 1 && height <= 1) {
-				y = y * pageH;
-				height = height * pageH;
-			}
-		}
 
 		console.debug(
 			"[Patches] Injecting patch",
@@ -518,23 +497,40 @@ router.post("/processes/:id/manual-image", requireAuth, async (req, res) => {
 			: [];
 
 		// Target box: where to place the image in the translated HTML.
-		// If the frontend didn't send a target, fall back to the (likely normalized) source box.
+		// If the frontend didn't send a target, fall back to the source box.
 		let targetBox = target && typeof target.x === "number" ? target : source;
 
-		// Ensure the patch has a visible size. If width/height are 0, give them a small default
-		// relative size so the image is actually visible on the translated page.
-		const MIN_RELATIVE_SIZE = 0.05; // 5% of the page as a fallback
-		if (typeof targetBox.width !== "number" || targetBox.width === 0) {
-			targetBox.width =
-				(typeof source.width === "number" && source.width > 0
-					? source.width
-					: MIN_RELATIVE_SIZE);
+		// Convert any normalized (0–1) coordinates to absolute pixels using page dimensions.
+		if (pageDims.width && pageDims.height) {
+			if (
+				targetBox.x >= 0 &&
+				targetBox.x <= 1 &&
+				typeof targetBox.width === "number" &&
+				targetBox.width > 0 &&
+				targetBox.width <= 1
+			) {
+				targetBox.x = targetBox.x * pageDims.width;
+				targetBox.width = targetBox.width * pageDims.width;
+			}
+			if (
+				targetBox.y >= 0 &&
+				targetBox.y <= 1 &&
+				typeof targetBox.height === "number" &&
+				targetBox.height > 0 &&
+				targetBox.height <= 1
+			) {
+				targetBox.y = targetBox.y * pageDims.height;
+				targetBox.height = targetBox.height * pageDims.height;
+			}
 		}
-		if (typeof targetBox.height !== "number" || targetBox.height === 0) {
-			targetBox.height =
-				(typeof source.height === "number" && source.height > 0
-					? source.height
-					: MIN_RELATIVE_SIZE);
+
+		// Ensure the patch has a visible size in pixels
+		const MIN_PIXEL_SIZE = 10;
+		if (!targetBox.width || targetBox.width < MIN_PIXEL_SIZE) {
+			targetBox.width = MIN_PIXEL_SIZE;
+		}
+		if (!targetBox.height || targetBox.height < MIN_PIXEL_SIZE) {
+			targetBox.height = MIN_PIXEL_SIZE;
 		}
 
 		const patch = {
