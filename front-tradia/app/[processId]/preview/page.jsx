@@ -146,7 +146,10 @@ export default function PreviewPage({ params }) {
   };
 
   const handleTestDragStart = (e) => {
-    e.dataTransfer.effectAllowed = "copy";
+    console.log("[Preview] handleTestDragStart fired");
+    e.dataTransfer.effectAllowed = "copyMove";
+    // Some browsers require at least one standard type to start a drag operation
+    e.dataTransfer.setData("text/plain", "maria-test-image");
     e.dataTransfer.setData(
       "application/x-maria-test-image",
       JSON.stringify({ dataUrl: testImageDataUrl }),
@@ -241,7 +244,7 @@ export default function PreviewPage({ params }) {
             <img
               src={testImageDataUrl}
               alt="Test drag image"
-              draggable
+              draggable={true}
               onDragStart={handleTestDragStart}
               className="w-12 h-12 border border-gray-400 cursor-move"
             />
@@ -296,16 +299,24 @@ export default function PreviewPage({ params }) {
             <div className="bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700">
               Translated PDF (auto‑reloaded after each patch)
             </div>
-            <div
-              className="relative flex-1 w-full h-full bg-gray-50"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDropOnTranslated}
-            >
+            <div className="relative flex-1 w-full h-full bg-gray-50">
+              {/* The iframe shows the PDF, but an invisible overlay on top captures drops */}
               <iframe
                 key={translatedKey}
                 src={translatedPdfUrl}
-                className="absolute inset-0 w-full h-full"
+                className="absolute inset-0 w-full h-full pointer-events-none"
                 title="Translated PDF preview"
+              />
+              <div
+                className="absolute inset-0 w-full h-full"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "copy";
+                }}
+                onDrop={(e) => {
+                  console.log("[Preview] Drop event on translated container");
+                  handleDropOnTranslated(e);
+                }}
               />
             </div>
           </div>

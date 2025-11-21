@@ -569,6 +569,11 @@ router.post(
 				});
 			}
 
+			console.debug(
+				"[Patches-Direct] Incoming body",
+				JSON.stringify({ processId, page, target, hasDataUrl: !!dataUrl }),
+			);
+
 			const process = await processFacade.getProcessById(processId, userId);
 			const pagesInfo = process.dataValues.pages_info || [];
 
@@ -628,6 +633,11 @@ router.post(
 				},
 				dataUrl,
 			};
+
+			console.debug(
+				"[Patches-Direct] Saving patch",
+				JSON.stringify(patch),
+			);
 
 			patches.push(patch);
 			config.manualPatches = patches;
