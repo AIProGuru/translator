@@ -468,12 +468,41 @@ router.post("/processes/:id/manual-image", requireAuth, async (req, res) => {
 		}
 
 		// Crop the source region from the original page image
+		const pageDims = pageEntry.page_info.dimensions || {};
+		let cropBox = {
+			x: source.x,
+			y: source.y,
+			width: source.width,
+			height: source.height,
+		};
+
+		// If the frontend sent normalized 0–1 coordinates, convert them to pixels
+		if (
+			pageDims.width &&
+			pageDims.height &&
+			cropBox.x >= 0 &&
+			cropBox.y >= 0 &&
+			cropBox.width >= 0 &&
+			cropBox.height >= 0 &&
+			cropBox.x <= 1 &&
+			cropBox.y <= 1 &&
+			cropBox.width <= 1 &&
+			cropBox.height <= 1
+		) {
+			cropBox = {
+				x: cropBox.x * pageDims.width,
+				y: cropBox.y * pageDims.height,
+				width: cropBox.width * pageDims.width,
+				height: cropBox.height * pageDims.height,
+			};
+		}
+
 		const buffer = await sharp(pageEntry.image.path)
 			.extract({
-				left: Math.max(0, Math.round(source.x)),
-				top: Math.max(0, Math.round(source.y)),
-				width: Math.max(1, Math.round(source.width)),
-				height: Math.max(1, Math.round(source.height)),
+				left: Math.max(0, Math.round(cropBox.x)),
+				top: Math.max(0, Math.round(cropBox.y)),
+				width: Math.max(1, Math.round(cropBox.width)),
+				height: Math.max(1, Math.round(cropBox.height)),
 			})
 			.png()
 			.toBuffer();
@@ -487,7 +516,25 @@ router.post("/processes/:id/manual-image", requireAuth, async (req, res) => {
 			? config.manualPatches
 			: [];
 
-		const targetBox = target && typeof target.x === "number" ? target : source;
+		// Target box: where to place the image in the translated HTML.
+		// If the frontend didn't send a target, fall back to the (likely normalized) source box.
+		let targetBox = target && typeof target.x === "number" ? target : source;
+
+		// Ensure the patch has a visible size. If width/height are 0, give them a small default
+		// relative size so the image is actually visible on the translated page.
+		const MIN_RELATIVE_SIZE = 0.05; // 5% of the page as a fallback
+		if (typeof targetBox.width !== "number" || targetBox.width === 0) {
+			targetBox.width =
+				(typeof source.width === "number" && source.width > 0
+					? source.width
+					: MIN_RELATIVE_SIZE);
+		}
+		if (typeof targetBox.height !== "number" || targetBox.height === 0) {
+			targetBox.height =
+				(typeof source.height === "number" && source.height > 0
+					? source.height
+					: MIN_RELATIVE_SIZE);
+		}
 
 		const patch = {
 			id: patches.length + 1,
