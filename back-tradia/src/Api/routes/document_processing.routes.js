@@ -500,31 +500,9 @@ router.post("/processes/:id/manual-image", requireAuth, async (req, res) => {
 		// If the frontend didn't send a target, fall back to the source box.
 		let targetBox = target && typeof target.x === "number" ? target : source;
 
-		// Convert any normalized (0–1) coordinates to absolute pixels using page dimensions.
-		if (pageDims.width && pageDims.height) {
-			if (
-				targetBox.x >= 0 &&
-				targetBox.x <= 1 &&
-				typeof targetBox.width === "number" &&
-				targetBox.width > 0 &&
-				targetBox.width <= 1
-			) {
-				targetBox.x = targetBox.x * pageDims.width;
-				targetBox.width = targetBox.width * pageDims.width;
-			}
-			if (
-				targetBox.y >= 0 &&
-				targetBox.y <= 1 &&
-				typeof targetBox.height === "number" &&
-				targetBox.height > 0 &&
-				targetBox.height <= 1
-			) {
-				targetBox.y = targetBox.y * pageDims.height;
-				targetBox.height = targetBox.height * pageDims.height;
-			}
-		}
-
-		// Ensure the patch has a visible size in pixels
+		// Here, we EXPECT targetBox to already be in absolute pixels (because the
+		// frontend selection was converted to image pixels before sending).
+		// Just make sure the patch has a visible size in pixels.
 		const MIN_PIXEL_SIZE = 10;
 		if (!targetBox.width || targetBox.width < MIN_PIXEL_SIZE) {
 			targetBox.width = MIN_PIXEL_SIZE;
@@ -562,5 +540,112 @@ router.post("/processes/:id/manual-image", requireAuth, async (req, res) => {
 		});
 	}
 });
+
+// Body: { page, target: { x, y, width, height }, dataUrl }
+// This endpoint skips cropping and directly uses a provided dataUrl (e.g. a test image)
+// to create a manual patch. Useful for testing drag-and-drop overlays.
+router.post(
+	"/processes/:id/manual-image-direct",
+	requireAuth,
+	async (req, res) => {
+		try {
+			const processId = req.params.id;
+			const userId = req.user.id;
+			const { page, target, dataUrl } = req.body || {};
+
+			if (
+				!page ||
+				!target ||
+				typeof target.x !== "number" ||
+				typeof target.y !== "number" ||
+				typeof target.width !== "number" ||
+				typeof target.height !== "number" ||
+				!dataUrl ||
+				typeof dataUrl !== "string"
+			) {
+				return res.status(400).json({
+					error:
+						"Invalid body. Expected { page, target: { x, y, width, height }, dataUrl }",
+				});
+			}
+
+			const process = await processFacade.getProcessById(processId, userId);
+			const pagesInfo = process.dataValues.pages_info || [];
+
+			const pageInfo =
+				Array.isArray(pagesInfo) &&
+				pagesInfo.find(
+					(p) => p.pageNumber === page || p.page_number === page,
+				);
+
+			const pageDims = pageInfo?.dimensions || {};
+
+			let targetBox = { ...target };
+
+			// If target box is expressed in 0–1 normalized coordinates, convert to pixels
+			if (
+				pageDims.width &&
+				pageDims.height &&
+				targetBox.x >= 0 &&
+				targetBox.x <= 1 &&
+				targetBox.y >= 0 &&
+				targetBox.y <= 1 &&
+				targetBox.width > 0 &&
+				targetBox.width <= 1 &&
+				targetBox.height > 0 &&
+				targetBox.height <= 1
+			) {
+				targetBox = {
+					x: targetBox.x * pageDims.width,
+					y: targetBox.y * pageDims.height,
+					width: targetBox.width * pageDims.width,
+					height: targetBox.height * pageDims.height,
+				};
+			}
+
+			// Ensure visible size
+			const MIN_PIXEL_SIZE = 20;
+			if (!targetBox.width || targetBox.width < MIN_PIXEL_SIZE) {
+				targetBox.width = MIN_PIXEL_SIZE;
+			}
+			if (!targetBox.height || targetBox.height < MIN_PIXEL_SIZE) {
+				targetBox.height = MIN_PIXEL_SIZE;
+			}
+
+			const config = process.dataValues.config || {};
+			const patches = Array.isArray(config.manualPatches)
+				? config.manualPatches
+				: [];
+
+			const patch = {
+				id: patches.length + 1,
+				page,
+				target: {
+					x: targetBox.x,
+					y: targetBox.y,
+					width: targetBox.width,
+					height: targetBox.height,
+				},
+				dataUrl,
+			};
+
+			patches.push(patch);
+			config.manualPatches = patches;
+
+			await processFacade.updateProcess(processId, { config }, userId);
+
+			return res.json({
+				success: true,
+				patch,
+				manualPatches: patches,
+			});
+		} catch (error) {
+			console.error("Error creating manual image patch (direct):", error);
+			res.status(500).json({
+				error: "Error creating manual image patch (direct)",
+			});
+		}
+	},
+);
 
 module.exports = router;

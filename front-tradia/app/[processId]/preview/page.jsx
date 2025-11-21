@@ -36,6 +36,10 @@ export default function PreviewPage({ params }) {
   const [message, setMessage] = useState("");
   const [translatedKey, setTranslatedKey] = useState(0);
 
+  // Simple inline test image (small red square) for drag-and-drop testing
+  const testImageDataUrl =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAABYlAAAWJQFJUiTwAAAAJklEQVR4nO3BAQ0AAADCoPdPbQ8HFAAAAAAAAAAAAAAAAAC4GAPiAAE2iI+SAAAAAElFTkSuQmCC";
+
   const handleMouseDown = (e) => {
     if (!originalImageRef.current) return;
     const rect = originalImageRef.current.getBoundingClientRect();
@@ -141,6 +145,77 @@ export default function PreviewPage({ params }) {
     }
   };
 
+  const handleTestDragStart = (e) => {
+    e.dataTransfer.effectAllowed = "copy";
+    e.dataTransfer.setData(
+      "application/x-maria-test-image",
+      JSON.stringify({ dataUrl: testImageDataUrl }),
+    );
+  };
+
+  const handleDropOnTranslated = async (e) => {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData("application/x-maria-test-image");
+    if (!raw) return;
+
+    try {
+      const { dataUrl } = JSON.parse(raw);
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const relX = (e.clientX - rect.left) / rect.width;
+      const relY = (e.clientY - rect.top) / rect.height;
+
+      const target = {
+        x: relX,
+        y: relY,
+        width: 0.2, // 20% of page width
+        height: 0.2, // 20% of page height
+      };
+
+      const body = {
+        page: 1,
+        target,
+        dataUrl,
+      };
+
+      const res = await fetch(
+        `${BACK_HOST}/api/processes/${processId}/manual-image-direct`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(body),
+          credentials: "include",
+        },
+      );
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        console.error(
+          "[Preview] manual-image-direct response not OK:",
+          res.status,
+          errJson,
+        );
+        throw new Error(
+          errJson.error || "Error creating manual image test patch",
+        );
+      }
+
+      console.log("[Preview] manual-image-direct patch saved successfully");
+      setMessage(
+        "Test image patch applied via drag-and-drop. Reloading translated preview...",
+      );
+      setTranslatedKey((k) => k + 1);
+    } catch (error) {
+      console.error("Error saving manual image test patch:", error);
+      setMessage(
+        "Error saving test patch. Check console/logs for more details.",
+      );
+    }
+  };
+
   return (
     <ProtectedRoute>
       <main className="container mx-auto px-4 py-8">
@@ -158,6 +233,19 @@ export default function PreviewPage({ params }) {
           </div>
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[80vh]">
+          <div className="mb-2 col-span-1 md:col-span-2 flex items-center gap-4">
+            <span className="text-sm text-gray-700">
+              Drag this test image onto the translated PDF (right side) to verify
+              image overlay:
+            </span>
+            <img
+              src={testImageDataUrl}
+              alt="Test drag image"
+              draggable
+              onDragStart={handleTestDragStart}
+              className="w-12 h-12 border border-gray-400 cursor-move"
+            />
+          </div>
           <div className="border rounded-lg overflow-hidden flex flex-col">
             <div className="bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700">
               Original (page 1) – drag to select a region (applied immediately)
@@ -208,7 +296,11 @@ export default function PreviewPage({ params }) {
             <div className="bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700">
               Translated PDF (auto‑reloaded after each patch)
             </div>
-            <div className="relative flex-1 w-full h-full bg-gray-50">
+            <div
+              className="relative flex-1 w-full h-full bg-gray-50"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDropOnTranslated}
+            >
               <iframe
                 key={translatedKey}
                 src={translatedPdfUrl}
