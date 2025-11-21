@@ -31,12 +31,14 @@ export default function PreviewPage({ params }) {
   const [isDragging, setIsDragging] = useState(false);
   const startRef = useRef({ x: 0, y: 0 });
   const originalContainerRef = useRef(null);
+  const originalImageRef = useRef(null);
+  const [imageMeta, setImageMeta] = useState(null); // natural vs displayed size
   const [message, setMessage] = useState("");
   const [translatedKey, setTranslatedKey] = useState(0);
 
   const handleMouseDown = (e) => {
-    if (!originalContainerRef.current) return;
-    const rect = originalContainerRef.current.getBoundingClientRect();
+    if (!originalImageRef.current) return;
+    const rect = originalImageRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     console.log("[Preview] mouseDown original:", { x, y, rect });
@@ -47,8 +49,8 @@ export default function PreviewPage({ params }) {
   };
 
   const handleMouseMove = (e) => {
-    if (!isDragging || !originalContainerRef.current) return;
-    const rect = originalContainerRef.current.getBoundingClientRect();
+    if (!isDragging || !originalImageRef.current) return;
+    const rect = originalImageRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const start = startRef.current;
@@ -67,23 +69,35 @@ export default function PreviewPage({ params }) {
   };
 
   const handleMouseUp = async () => {
-    if (!isDragging || !selection || !originalContainerRef.current) return;
+    if (!isDragging || !selection || !originalImageRef.current || !imageMeta)
+      return;
     setIsDragging(false);
 
     try {
-      // Normalize to 0–1 relative coordinates within original container
-      const rect = originalContainerRef.current.getBoundingClientRect();
+      // Map selection (display pixels) to original image pixel coordinates
+      const rect = originalImageRef.current.getBoundingClientRect();
+      const { naturalWidth, naturalHeight, displayWidth, displayHeight } =
+        imageMeta;
+      const scaleX = naturalWidth / displayWidth;
+      const scaleY = naturalHeight / displayHeight;
+
       const source = {
-        x: selection.x / rect.width,
-        y: selection.y / rect.height,
-        width: selection.width / rect.width,
-        height: selection.height / rect.height,
+        x: selection.x * scaleX,
+        y: selection.y * scaleY,
+        width: selection.width * scaleX,
+        height: selection.height * scaleY,
       };
-      console.log("[Preview] mouseUp normalized source:", {
-        selection,
-        rect,
-        source,
-      });
+      console.log(
+        "[Preview] mouseUp source in original image pixels:",
+        {
+          selection,
+          rect,
+          imageMeta,
+          scaleX,
+          scaleY,
+          source,
+        },
+      );
 
       const body = {
         page: 1,
@@ -156,9 +170,26 @@ export default function PreviewPage({ params }) {
               onMouseUp={handleMouseUp}
             >
               <img
+                ref={originalImageRef}
                 src={originalImageUrl}
                 alt="Original page 1"
                 className="w-full h-full object-contain"
+                onLoad={(e) => {
+                  const img = e.currentTarget;
+                  const rect = img.getBoundingClientRect();
+                  setImageMeta({
+                    naturalWidth: img.naturalWidth,
+                    naturalHeight: img.naturalHeight,
+                    displayWidth: rect.width,
+                    displayHeight: rect.height,
+                  });
+                  console.log("[Preview] original image meta:", {
+                    naturalWidth: img.naturalWidth,
+                    naturalHeight: img.naturalHeight,
+                    displayWidth: rect.width,
+                    displayHeight: rect.height,
+                  });
+                }}
               />
               {selection && (
                 <div
