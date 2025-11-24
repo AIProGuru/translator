@@ -1,15 +1,22 @@
 'use client';
 
-import { use, useState, useCallback } from "react";
+import { use, useEffect, useState, useCallback, useRef } from "react";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import { BACK_HOST } from "@/lib/constants";
 import { useAuth } from "../../context/AuthContext";
-import { Worker, Viewer } from "@react-pdf-viewer/core";
 import { PDFDocument } from "pdf-lib";
-import Cropper from "react-easy-crop";
+import ReactCrop from "react-image-crop";
 import { DndContext, useDraggable, useDroppable } from "@dnd-kit/core";
+import * as pdfjsLib from "pdfjs-dist/build/pdf";
 
 import "@react-pdf-viewer/core/lib/styles/index.css";
+import "react-image-crop/dist/ReactCrop.css";
+
+// Configure pdf.js worker for client-side rendering of translated PDF pages
+if (typeof window !== "undefined") {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.worker.min.js";
+}
 
 function DraggablePatch({ patch }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -50,74 +57,148 @@ export default function PreviewPage({ params }) {
       )}`
     : `${BACK_HOST}/api/preview/original/${processId}`;
 
-  const translatedPdfUrl = token
+  // Use the standard translated preview (with dotted placeholders) for on-screen viewing,
+  // but a "clean" version (without dotted placeholders) as the base for the merged download.
+  const translatedPdfPreviewUrl = token
     ? `${BACK_HOST}/api/preview/translated/${processId}?token=${encodeURIComponent(
         token,
       )}`
     : `${BACK_HOST}/api/preview/translated/${processId}`;
 
+  const translatedPdfCleanUrl = token
+    ? `${BACK_HOST}/api/preview/translated-clean/${processId}?token=${encodeURIComponent(
+        token,
+      )}`
+    : `${BACK_HOST}/api/preview/translated-clean/${processId}`;
+
   const [message, setMessage] = useState("");
   const [cropImageUrl, setCropImageUrl] = useState(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [crop, setCrop] = useState({
+    unit: "%",
+    x: 20,
+    y: 20,
+    width: 40,
+    height: 30,
+  });
+  const [completedCrop, setCompletedCrop] = useState(null); // ReactCrop crop in pixels
   const [patches, setPatches] = useState([]);
-  const [placedPatches, setPlacedPatches] = useState([]); // { id, page, x, y, relWidth, relHeight, dataUrl }
+  const [placedPatches, setPlacedPatches] = useState([]); // { id, page, x, y, relWidth, relHeight, scaleX?, scaleY?, dataUrl }
+  const [activePatchId, setActivePatchId] = useState(null);
+  const [hoverPatchId, setHoverPatchId] = useState(null);
+  const [hoverHandle, setHoverHandle] = useState(null);
+  const dragStateRef = useRef(null); // { id, startClientX, startClientY, origX, origY, overlayRect }
+  const translatedOverlayRef = useRef(null);
+  const originalImgRef = useRef(null);
+  const translatedCanvasRef = useRef(null);
+  const [translatedPdfDoc, setTranslatedPdfDoc] = useState(null);
+  const [translatedPage, setTranslatedPage] = useState(1);
+  const [translatedNumPages, setTranslatedNumPages] = useState(1);
 
-  const onCropComplete = useCallback((_, croppedPixels) => {
-    setCroppedAreaPixels(croppedPixels);
-  }, []);
+  useEffect(() => {
+    // Auto-load current page image for cropping on mount or when page changes
+    const imgUrl = token
+      ? `${BACK_HOST}/api/preview/original-image/${processId}/${currentPage}?token=${encodeURIComponent(
+          token,
+        )}`
+      : `${BACK_HOST}/api/preview/original-image/${processId}/${currentPage}`;
+    setCropImageUrl(imgUrl);
+    setMessage(
+      `Original page ${currentPage} image loaded. Drag on the left page to select an area.`,
+    );
+  }, [processId, token, currentPage]);
 
-  const handleLoadCropImage = async () => {
-    try {
-      const imgUrl = token
-        ? `${BACK_HOST}/api/preview/original-image/${processId}/1?token=${encodeURIComponent(
-            token,
-          )}`
-        : `${BACK_HOST}/api/preview/original-image/${processId}/1`;
-      setCropImageUrl(imgUrl);
-      setMessage("Original page image loaded for cropping.");
-    } catch (error) {
-      console.error("Error loading crop image:", error);
-      setMessage("Error loading crop image. Check console for details.");
-    }
-  };
+  // Load translated PDF once for client-side page rendering
+  useEffect(() => {
+    let cancelled = false;
+    const loadPdf = async () => {
+      try {
+        const res = await fetch(translatedPdfPreviewUrl, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) return;
+        const buffer = await res.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+        if (cancelled) return;
+        setTranslatedPdfDoc(pdf);
+        setTranslatedNumPages(pdf.numPages || 1);
+      } catch (error) {
+        console.error("Error loading translated PDF for preview:", error);
+      }
+    };
+    loadPdf();
+    return () => {
+      cancelled = true;
+    };
+  }, [translatedPdfPreviewUrl, token]);
+
+  // Render the current translated page into the canvas
+  useEffect(() => {
+    const renderPage = async () => {
+      if (!translatedPdfDoc || !translatedCanvasRef.current) return;
+      try {
+        const pageIndex = Math.min(
+          Math.max(translatedPage, 1),
+          translatedNumPages,
+        );
+        const page = await translatedPdfDoc.getPage(pageIndex);
+        const canvas = translatedCanvasRef.current;
+        const context = canvas.getContext("2d");
+
+        // Fit the translated page to the available width while preserving aspect ratio
+        const initialViewport = page.getViewport({ scale: 1 });
+        const container = canvas.parentElement;
+        const containerWidth =
+          (container && container.clientWidth) || initialViewport.width;
+        const scale = containerWidth / initialViewport.width;
+        const viewport = page.getViewport({ scale });
+
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        await page
+          .render({
+            canvasContext: context,
+            viewport,
+          })
+          .promise;
+      } catch (error) {
+        console.error("Error rendering translated page:", error);
+      }
+    };
+    renderPage();
+  }, [translatedPdfDoc, translatedPage, translatedNumPages]);
 
   const createPatchFromCrop = useCallback(async () => {
-    if (!cropImageUrl || !croppedAreaPixels) return;
+    if (!cropImageUrl || !completedCrop || !originalImgRef.current) return;
     try {
-      const image = new Image();
-      image.crossOrigin = "anonymous";
-      image.src = cropImageUrl;
-
-      await new Promise((resolve, reject) => {
-        image.onload = () => resolve();
-        image.onerror = reject;
-      });
+      const image = originalImgRef.current;
+      const scaleX = image.naturalWidth / image.width;
+      const scaleY = image.naturalHeight / image.height;
 
       const canvas = document.createElement("canvas");
-      canvas.width = croppedAreaPixels.width;
-      canvas.height = croppedAreaPixels.height;
+      canvas.width = completedCrop.width;
+      canvas.height = completedCrop.height;
       const ctx = canvas.getContext("2d");
 
       ctx.drawImage(
         image,
-        croppedAreaPixels.x,
-        croppedAreaPixels.y,
-        croppedAreaPixels.width,
-        croppedAreaPixels.height,
+        completedCrop.x * scaleX,
+        completedCrop.y * scaleY,
+        completedCrop.width * scaleX,
+        completedCrop.height * scaleY,
         0,
         0,
-        croppedAreaPixels.width,
-        croppedAreaPixels.height,
+        completedCrop.width,
+        completedCrop.height,
       );
 
       const dataUrl = canvas.toDataURL("image/png");
       const newPatch = {
         id: `patch-${patches.length + 1}`,
         page: 1,
-        width: croppedAreaPixels.width,
-        height: croppedAreaPixels.height,
+        width: canvas.width,
+        height: canvas.height,
         dataUrl,
       };
 
@@ -127,7 +208,7 @@ export default function PreviewPage({ params }) {
       console.error("Error creating patch from crop:", error);
       setMessage("Error creating patch from crop. Check console for details.");
     }
-  }, [cropImageUrl, croppedAreaPixels, patches.length]);
+  }, [cropImageUrl, completedCrop, patches.length]);
 
   const TranslatedDropArea = () => {
     const { setNodeRef } = useDroppable({ id: "translated-drop-area" });
@@ -147,24 +228,235 @@ export default function PreviewPage({ params }) {
     const patch = active.data.current?.patch;
     if (!patch) return;
 
+    const overRect = over.rect;
+    const activeRect =
+      active.rect.current.translated || active.rect.current.initial;
+
+    // Compute the center of the dragged patch relative to the drop area
+    const centerX = activeRect.left + activeRect.width / 2;
+    const centerY = activeRect.top + activeRect.height / 2;
+
+    let relX = (centerX - overRect.left) / overRect.width;
+    let relY = (centerY - overRect.top) / overRect.height;
+
+    // Approximate relative size based on crop size vs. viewer size
+    let relWidth = patch.width / overRect.width;
+    let relHeight = patch.height / overRect.height;
+
+    const clamp01 = (v) => Math.max(0, Math.min(1, v));
+    relX = clamp01(relX);
+    relY = clamp01(relY);
+    relWidth = clamp01(relWidth);
+    relHeight = clamp01(relHeight);
+
+    const placedId = `${patch.id}-p${translatedPage}-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+
     const placed = {
       ...patch,
-      page: 1,
-      x: 0.4,
-      y: 0.4,
-      relWidth: 0.2,
-      relHeight: 0.2,
+      id: placedId,
+      page: translatedPage,
+      x: relX,
+      y: relY,
+      relWidth,
+      relHeight,
+      // Independent scaling factors for width/height (default 1)
+      scaleX: patch.scaleX ?? 1,
+      scaleY: patch.scaleY ?? 1,
     };
 
     setPlacedPatches((prev) => [...prev, placed]);
-    setMessage("Patch dropped on translated PDF (approximate position).");
+    setActivePatchId(placedId);
+    setMessage("Patch dropped on translated PDF.");
+  };
+
+  const handlePatchMouseDown = (patchId, event, forcedHandle = null) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const overlayEl = translatedOverlayRef.current;
+    if (!overlayEl) return;
+    const overlayRect = overlayEl.getBoundingClientRect();
+    const patch = placedPatches.find((p) => p.id === patchId);
+    if (!patch) return;
+    let handle = forcedHandle;
+    if (!handle) {
+      const patchRect = event.currentTarget.getBoundingClientRect();
+      const edgeThreshold = 8;
+      const nearLeft =
+        Math.abs(event.clientX - patchRect.left) <= edgeThreshold;
+      const nearRight =
+        Math.abs(event.clientX - patchRect.right) <= edgeThreshold;
+      const nearTop = Math.abs(event.clientY - patchRect.top) <= edgeThreshold;
+      const nearBottom =
+        Math.abs(event.clientY - patchRect.bottom) <= edgeThreshold;
+
+      if (nearLeft && nearTop) handle = "nw";
+      else if (nearRight && nearTop) handle = "ne";
+      else if (nearLeft && nearBottom) handle = "sw";
+      else if (nearRight && nearBottom) handle = "se";
+      else if (nearLeft) handle = "w";
+      else if (nearRight) handle = "e";
+      else if (nearTop) handle = "n";
+      else if (nearBottom) handle = "s";
+    }
+
+    setHoverPatchId(patchId);
+    setHoverHandle(handle);
+
+    if (!handle) {
+      // Move mode (drag whole patch)
+      dragStateRef.current = {
+        mode: "move",
+        id: patchId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        origX: patch.x,
+        origY: patch.y,
+        overlayRect,
+      };
+    } else {
+      // Resize mode
+      const relWidth = patch.relWidth;
+      const relHeight = patch.relHeight;
+      const origLeft = patch.x - relWidth / 2;
+      const origRight = patch.x + relWidth / 2;
+      const origTop = patch.y - relHeight / 2;
+      const origBottom = patch.y + relHeight / 2;
+      dragStateRef.current = {
+        mode: "resize",
+        id: patchId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        overlayRect,
+        handle,
+        origLeft,
+        origRight,
+        origTop,
+        origBottom,
+      };
+    }
+    setActivePatchId(patchId);
+  };
+
+  const handlePatchHover = (patchId, event) => {
+    const patchRect = event.currentTarget.getBoundingClientRect();
+    const edgeThreshold = 8;
+    const nearLeft = Math.abs(event.clientX - patchRect.left) <= edgeThreshold;
+    const nearRight =
+      Math.abs(event.clientX - patchRect.right) <= edgeThreshold;
+    const nearTop = Math.abs(event.clientY - patchRect.top) <= edgeThreshold;
+    const nearBottom =
+      Math.abs(event.clientY - patchRect.bottom) <= edgeThreshold;
+
+    let handle = null;
+    if (nearLeft && nearTop) handle = "nw";
+    else if (nearRight && nearTop) handle = "ne";
+    else if (nearLeft && nearBottom) handle = "sw";
+    else if (nearRight && nearBottom) handle = "se";
+    else if (nearLeft) handle = "w";
+    else if (nearRight) handle = "e";
+    else if (nearTop) handle = "n";
+    else if (nearBottom) handle = "s";
+
+    setHoverPatchId(patchId);
+    setHoverHandle(handle);
+  };
+
+  const handleOverlayMouseMove = (event) => {
+    const state = dragStateRef.current;
+    if (!state) return;
+    const dx = event.clientX - state.startClientX;
+    const dy = event.clientY - state.startClientY;
+
+    const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+    if (state.mode === "move") {
+      const { id, origX, origY, overlayRect } = state;
+      const relDx = dx / overlayRect.width;
+      const relDy = dy / overlayRect.height;
+
+      setPlacedPatches((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                x: clamp01(origX + relDx),
+                y: clamp01(origY + relDy),
+              }
+            : p,
+        ),
+      );
+    } else if (state.mode === "resize") {
+      const {
+        id,
+        overlayRect,
+        handle,
+        origLeft,
+        origRight,
+        origTop,
+        origBottom,
+      } = state;
+      const dRelX = dx / overlayRect.width;
+      const dRelY = dy / overlayRect.height;
+
+      let newLeft = origLeft;
+      let newRight = origRight;
+      let newTop = origTop;
+      let newBottom = origBottom;
+
+      if (handle.includes("e")) newRight = origRight + dRelX;
+      if (handle.includes("w")) newLeft = origLeft + dRelX;
+      if (handle.includes("s")) newBottom = origBottom + dRelY;
+      if (handle.includes("n")) newTop = origTop + dRelY;
+
+      newLeft = clamp01(newLeft);
+      newRight = clamp01(newRight);
+      newTop = clamp01(newTop);
+      newBottom = clamp01(newBottom);
+
+      const minSize = 0.01;
+      if (newRight - newLeft < minSize) {
+        if (handle.includes("e")) newRight = newLeft + minSize;
+        else if (handle.includes("w")) newLeft = newRight - minSize;
+      }
+      if (newBottom - newTop < minSize) {
+        if (handle.includes("s")) newBottom = newTop + minSize;
+        else if (handle.includes("n")) newTop = newBottom - minSize;
+      }
+
+      const newWidth = newRight - newLeft;
+      const newHeight = newBottom - newTop;
+      const newCenterX = (newLeft + newRight) / 2;
+      const newCenterY = (newTop + newBottom) / 2;
+
+      setPlacedPatches((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                x: clamp01(newCenterX),
+                y: clamp01(newCenterY),
+                relWidth: clamp01(newWidth),
+                relHeight: clamp01(newHeight),
+              }
+            : p,
+        ),
+      );
+    }
+  };
+
+  const handleOverlayMouseUp = () => {
+    dragStateRef.current = null;
+    setHoverPatchId(null);
+    setHoverHandle(null);
   };
 
   const handleDownloadMerged = async () => {
     try {
       setMessage("Generating merged PDF in browser...");
 
-      const res = await fetch(translatedPdfUrl, {
+      const res = await fetch(translatedPdfCleanUrl, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) {
@@ -182,11 +474,19 @@ export default function PreviewPage({ params }) {
         const pageWidth = page.getWidth();
         const pageHeight = page.getHeight();
 
-        const width = patch.relWidth * pageWidth;
-        const height = patch.relHeight * pageHeight;
-        const x = patch.x * pageWidth;
-        const yFromTop = patch.y * pageHeight;
-        const y = pageHeight - yFromTop - height;
+        const scaleX = patch.scaleX || 1;
+        const scaleY = patch.scaleY || 1;
+        const width = patch.relWidth * scaleX * pageWidth;
+        const height = patch.relHeight * scaleY * pageHeight;
+
+        // Our on-screen overlay stores patch.x / patch.y as the CENTER of the patch
+        // (we render with left/top at x,y and translate(-50%, -50%)).
+        // Convert this center-based coordinate into the bottom-left origin
+        // that pdf-lib expects, adjusting by half the width/height.
+        const centerX = patch.x * pageWidth;
+        const centerYFromTop = patch.y * pageHeight;
+        const x = centerX - width / 2;
+        const y = pageHeight - centerYFromTop - height / 2;
 
         const base64 = patch.dataUrl.split(",")[1] || "";
         const binary = atob(base64);
@@ -238,43 +538,66 @@ export default function PreviewPage({ params }) {
         )}
 
         <DndContext onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[70vh]">
-            {/* Left: Original PDF viewer + crop area */}
-            <div className="border rounded-lg overflow-hidden flex flex-col">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Left: Original PDF viewer with crop overlay and page navigation */}
+            <div className="border rounded-lg flex flex-col">
               <div className="bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 flex items-center justify-between">
-                <span>Original PDF (page 1)</span>
-                <button
-                  onClick={handleLoadCropImage}
-                  className="px-2 py-1 text-xs font-semibold text-white bg-blue-600 rounded hover:bg-blue-700"
-                >
-                  Load page for cropping
-                </button>
+                <span>
+                  Original PDF – page {currentPage} (drag to select a region)
+                </span>
+                <div className="flex items-center gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentPage((p) => (p > 1 ? p - 1 : 1))
+                    }
+                    className="px-2 py-0.5 border rounded disabled:opacity-40"
+                    disabled={currentPage <= 1}
+                  >
+                    Prev
+                  </button>
+                  <input
+                    type="number"
+                    min={1}
+                    value={currentPage}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value || "1", 10);
+                      setCurrentPage(isNaN(v) || v < 1 ? 1 : v);
+                    }}
+                    className="w-12 border rounded px-1 py-0.5 text-center"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => p + 1)}
+                    className="px-2 py-0.5 border rounded"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-              <div className="flex-1 grid grid-rows-2">
-                <div className="relative overflow-hidden bg-gray-50">
-                  <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js">
-                    <Viewer fileUrl={originalPdfUrl} />
-                  </Worker>
-                </div>
-                <div className="relative bg-black/5 flex items-center justify-center">
-                  {cropImageUrl ? (
-                    <div className="relative w-full h-full">
-                      <Cropper
-                        image={cropImageUrl}
-                        crop={crop}
-                        zoom={zoom}
-                        aspect={4 / 3}
-                        onCropChange={setCrop}
-                        onZoomChange={setZoom}
-                        onCropComplete={onCropComplete}
-                      />
-                    </div>
-                  ) : (
-                    <div className="text-xs text-gray-500 px-2">
-                      Click &quot;Load page for cropping&quot; to enable selection.
-                    </div>
-                  )}
-                </div>
+              <div className="relative flex-1 bg-gray-50 flex items-center justify-center">
+                {cropImageUrl ? (
+                  <ReactCrop
+                    crop={crop}
+                    onChange={(c) => setCrop(c)}
+                    onComplete={(c) => setCompletedCrop(c)}
+                    keepSelection
+                    ruleOfThirds={false}
+                    className="w-full flex justify-center"
+                  >
+                    <img
+                      ref={originalImgRef}
+                      src={cropImageUrl}
+                      alt="Original page 1"
+                      crossOrigin="anonymous"
+                      className="w-full h-auto"
+                    />
+                  </ReactCrop>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-xs text-gray-500 px-2">
+                    Loading original page image...
+                  </div>
+                )}
               </div>
               <div className="p-2 border-t border-gray-200 flex items-center justify-between">
                 <div className="text-xs text-gray-500">
@@ -282,7 +605,7 @@ export default function PreviewPage({ params }) {
                 </div>
                 <button
                   onClick={createPatchFromCrop}
-                  disabled={!cropImageUrl || !croppedAreaPixels}
+                  disabled={!cropImageUrl || !completedCrop}
                   className="px-2 py-1 text-xs font-semibold text-white bg-emerald-600 rounded hover:bg-emerald-700 disabled:opacity-40"
                 >
                   Create patch from crop
@@ -290,18 +613,131 @@ export default function PreviewPage({ params }) {
               </div>
             </div>
 
-            {/* Right: Translated PDF viewer + drop area */}
-            <div className="border rounded-lg overflow-hidden flex flex-col">
-              <div className="bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700">
-                Translated PDF (drop patches here)
+            {/* Right: Translated PDF viewer (single page) + drop area + patch editor */}
+            <div className="border rounded-lg flex flex-col">
+              <div className="bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 flex items-center justify-between">
+                <span>
+                  Translated PDF – page {translatedPage} (drop patches on this
+                  page)
+                </span>
+                <div className="flex items-center gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTranslatedPage((p) => (p > 1 ? p - 1 : 1))
+                    }
+                    className="px-2 py-0.5 border rounded disabled:opacity-40"
+                    disabled={translatedPage <= 1}
+                  >
+                    Prev
+                  </button>
+                  <span>
+                    {translatedPage} / {translatedNumPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTranslatedPage((p) =>
+                        p < translatedNumPages ? p + 1 : p,
+                      )
+                    }
+                    className="px-2 py-0.5 border rounded disabled:opacity-40"
+                    disabled={translatedPage >= translatedNumPages}
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-              <div className="relative flex-1 bg-gray-50">
-                <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js">
-                  <Viewer fileUrl={translatedPdfUrl} />
-                </Worker>
-                {/* Drop area over viewer */}
-                <div className="absolute inset-0 pointer-events-none">
-                  <TranslatedDropArea />
+              <div className="relative flex-1 bg-gray-50 flex items-center justify-center">
+                <div className="relative w-full flex justify-center">
+                  <canvas
+                    ref={translatedCanvasRef}
+                    className="block bg-white w-full h-auto"
+                  />
+                  {/* Drop & overlay area over current page canvas */}
+                  <div
+                    ref={translatedOverlayRef}
+                    className="absolute inset-0"
+                    onMouseMove={handleOverlayMouseMove}
+                    onMouseUp={handleOverlayMouseUp}
+                    onMouseLeave={handleOverlayMouseUp}
+                  >
+                    {placedPatches
+                      .filter((p) => p.page === translatedPage)
+                      .map((p) => {
+                        const isHover = hoverPatchId === p.id;
+                        const handle = isHover ? hoverHandle : null;
+                        let cursor = "move";
+                        if (handle === "n" || handle === "s") cursor = "ns-resize";
+                        else if (handle === "e" || handle === "w")
+                          cursor = "ew-resize";
+                        else if (handle === "ne" || handle === "sw")
+                          cursor = "nesw-resize";
+                        else if (handle === "nw" || handle === "se")
+                          cursor = "nwse-resize";
+
+                        const commonStyle = {
+                          left: `${p.x * 100}%`,
+                          top: `${p.y * 100}%`,
+                          width: `${p.relWidth * (p.scaleX || 1) * 100}%`,
+                          height: `${p.relHeight * (p.scaleY || 1) * 100}%`,
+                          transform: "translate(-50%, -50%)",
+                        };
+
+                        return (
+                          <div
+                            key={p.id}
+                            className="absolute"
+                            style={commonStyle}
+                            onMouseDown={(e) => handlePatchMouseDown(p.id, e)}
+                            onMouseMove={(e) => handlePatchHover(p.id, e)}
+                            onMouseLeave={() => {
+                              if (hoverPatchId === p.id) {
+                                setHoverPatchId(null);
+                                setHoverHandle(null);
+                              }
+                            }}
+                          >
+                            <img
+                              src={p.dataUrl}
+                              alt={`Placed ${p.id}`}
+                              className="w-full h-full object-contain border border-red-500"
+                              style={{
+                                boxShadow:
+                                  p.id === activePatchId
+                                    ? "0 0 0 2px rgba(59,130,246,0.8)"
+                                    : undefined,
+                                cursor,
+                              }}
+                              draggable={false}
+                            />
+                            {/* Corner resize handles */}
+                            {[
+                              { pos: "nw", style: { top: -6, left: -6 } },
+                              { pos: "ne", style: { top: -6, right: -6 } },
+                              { pos: "sw", style: { bottom: -6, left: -6 } },
+                              { pos: "se", style: { bottom: -6, right: -6 } },
+                            ].map((h) => (
+                              <div
+                                key={h.pos}
+                                className="absolute w-3 h-3 rounded-full bg-white border border-blue-500"
+                                style={{
+                                  ...h.style,
+                                  cursor:
+                                    h.pos === "nw" || h.pos === "se"
+                                      ? "nwse-resize"
+                                      : "nesw-resize",
+                                }}
+                                onMouseDown={(e) =>
+                                  handlePatchMouseDown(p.id, e, h.pos)
+                                }
+                              />
+                            ))}
+                          </div>
+                        );
+                      })}
+                    <TranslatedDropArea />
+                  </div>
                 </div>
               </div>
             </div>
@@ -324,8 +760,96 @@ export default function PreviewPage({ params }) {
             </div>
           </div>
 
-          {/* Download button */}
-          <div className="mt-4 flex items-center justify-end">
+          {/* Scale + download controls */}
+          <div className="mt-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 text-xs text-gray-600">
+              {activePatchId ? (
+                <>
+                  <span>Selected patch:</span>
+                  {/* Page selector for the active patch */}
+                  <label className="flex items-center gap-1">
+                    <span>Page</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={
+                        placedPatches.find((p) => p.id === activePatchId)
+                          ?.page || 1
+                      }
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value || "1", 10);
+                        const page = isNaN(value) || value < 1 ? 1 : value;
+                        setPlacedPatches((prev) =>
+                          prev.map((p) =>
+                            p.id === activePatchId ? { ...p, page } : p,
+                          ),
+                        );
+                      }}
+                      className="w-12 border rounded px-1 py-0.5 text-center"
+                    />
+                  </label>
+                  {/* Width slider for the active patch */}
+                  <span>Width</span>
+                  <input
+                    type="range"
+                    min={0.1}
+                    max={2}
+                    step={0.1}
+                    value={
+                      placedPatches.find((p) => p.id === activePatchId)
+                        ?.scaleX || 1
+                    }
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value);
+                      setPlacedPatches((prev) =>
+                        prev.map((p) =>
+                          p.id === activePatchId
+                            ? { ...p, scaleX: value }
+                            : p,
+                        ),
+                      );
+                    }}
+                  />
+                  {/* Height slider for the active patch */}
+                  <span>Height</span>
+                  <input
+                    type="range"
+                    min={0.1}
+                    max={2}
+                    step={0.1}
+                    value={
+                      placedPatches.find((p) => p.id === activePatchId)
+                        ?.scaleY || 1
+                    }
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value);
+                      setPlacedPatches((prev) =>
+                        prev.map((p) =>
+                          p.id === activePatchId
+                            ? { ...p, scaleY: value }
+                            : p,
+                        ),
+                      );
+                    }}
+                  />
+                  {/* Delete active patch */}
+                  <button
+                    type="button"
+                    className="ml-2 px-2 py-1 border rounded text-red-600 border-red-300 hover:bg-red-50"
+                    onClick={() => {
+                      setPlacedPatches((prev) =>
+                        prev.filter((p) => p.id !== activePatchId),
+                      );
+                      setActivePatchId(null);
+                    }}
+                  >
+                    Delete
+                  </button>
+                </>
+              ) : (
+                <span>Select a placed patch to adjust its size.</span>
+              )}
+            </div>
             <button
               onClick={handleDownloadMerged}
               disabled={placedPatches.length === 0}

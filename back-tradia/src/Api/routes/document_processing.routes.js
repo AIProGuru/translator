@@ -18,6 +18,24 @@ const facade = new DocumentProcessingFacade();
 const processFacade = new ProcessFacade();
 const fileManagement = new FileManagementService();
 
+/**
+ * Remove placeholder elements that represent "dotted" image/signature markers.
+ * These are useful in the HTML/preview, but should not appear in the final
+ * translated PDF the user downloads.
+ *
+ * We match any element whose:
+ *  - class contains "maria-signature" or "maria-image", OR
+ *  - inline style contains a dotted border declaration.
+ */
+function stripPlaceholderRegions(html) {
+	if (!html) return html;
+
+	const placeholderRegex =
+		/<([a-zA-Z0-9]+)([^>]*(?:class=["'][^"']*maria-(?:signature|image)[^"']*["']|style=["'][^"']*border[^"']*dotted[^"']*["'])[^>]*)(?:>([\s\S]*?)<\/\1>|\/>)/gi;
+
+	return html.replace(placeholderRegex, "");
+}
+
 router.post("/process-document", requireAuth, async (req, res) => {
 	facade.getUploadMiddleware()(req, res, async (err) => {
 		if (err) return res.status(400).json({ error: err.message });
@@ -188,18 +206,22 @@ router.post("/download/:id", requireAuth, async (req, res) => {
 
 		const processDir = fileManagement.createProcessDirectory(processId);
 		let filePath = "";
-		const _exports = new Export({
-			html: output_html,
-			process,
-			process_dir: processDir,
-			dimensions,
-		});
 		if (!output_html) {
 			return res.status(404).json({
 				error: "Result of this process not found",
 			});
 		}
 		if (type === "pdf") {
+			// For the final translated PDF, strip dotted placeholder regions so
+			// users only see real content (and any patches they added later),
+			// not the visual hints produced by the LLM.
+			const cleanedHtml = stripPlaceholderRegions(output_html);
+			const _exports = new Export({
+				html: cleanedHtml,
+				process,
+				process_dir: processDir,
+				dimensions,
+			});
 			filePath = await _exports.toPDF();
 		} else if (type === "docx") {
 			const buffer = await htmlToDocx(output_html, null, {
@@ -211,6 +233,12 @@ router.post("/download/:id", requireAuth, async (req, res) => {
 			filePath = path.join(processDir, `traduccion-${processId}.docx`);
 			fs.writeFileSync(filePath, buffer);
 		} else if (type === "html") {
+			const _exports = new Export({
+				html: output_html,
+				process,
+				process_dir: processDir,
+				dimensions,
+			});
 			filePath = await _exports.toHTML();
 		}
 		if (!filePath)
@@ -288,6 +316,51 @@ router.get("/preview/translated/:id", requireAuth, async (req, res) => {
 		});
 	}
 });
+
+// Preview translated PDF WITHOUT dotted placeholder divs (used as clean base for merged downloads)
+router.get(
+	"/preview/translated-clean/:id",
+	requireAuth,
+	async (req, res) => {
+		try {
+			const processId = req.params.id;
+			const userId = req.user.id;
+
+			const process = await processFacade.getProcessById(processId, userId);
+			let output_html = process?.dataValues?.html;
+			let dimensions = process?.dataValues?.pages_info[0].dimensions;
+
+			const processDir = fileManagement.createProcessDirectory(processId);
+			let filePath = "";
+
+			if (!output_html) {
+				return res.status(404).json({
+					error: "Result of this process not found",
+				});
+			}
+
+			const cleanedHtml = stripPlaceholderRegions(output_html);
+			const _exports = new Export({
+				html: cleanedHtml,
+				process,
+				process_dir: processDir,
+				dimensions,
+			});
+
+			filePath = await _exports.toPDF();
+
+			if (!filePath)
+				return res
+					.status(500)
+					.json({ error: "Error generating preview PDF" });
+			return res.sendFile(filePath);
+		} catch (error) {
+			res.status(500).json({
+				error: "Error previewing translated PDF",
+			});
+		}
+	},
+);
 
 // Serve original page image (PNG) for a given process and page number
 router.get(

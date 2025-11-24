@@ -64,7 +64,10 @@
     "pdf-lib": "^1.17.1",
     "@react-pdf-viewer/core": "^3.12.0",
     "@react-pdf-viewer/default-layout": "^3.12.0",
+    "@react-pdf-viewer/page-navigation": "^3.12.0",
+    "pdfjs-dist": "^2.16.105",
     "react-easy-crop": "^5.0.0",
+    "react-image-crop": "^11.0.7",
     "@dnd-kit/core": "^6.0.8"
   },
   "devDependencies": {

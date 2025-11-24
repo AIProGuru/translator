@@ -39,19 +39,24 @@ class Export {
 
 			await page.setContent(this.config.html, { waitUntil: "networkidle0" });
 
-			// Make the PDF page the same size as the original page (in CSS pixels).
-			const pdfOptions = width && height
-				? {
-						path: file_path,
-						printBackground: true,
-						width: `${width}px`,
-						height: `${height}px`,
-				  }
-				: {
-						path: file_path,
-						printBackground: true,
-						format: "A4",
-				  };
+			// Make the PDF page the same physical size as the original page.
+			// The source PNG dimensions come from `pdftoppm`, which renders at 150 DPI by default.
+			// Convert those pixel dimensions back to inches so the resulting PDF
+			// matches the original when viewed at 100% zoom.
+			const IMAGE_DPI = 150;
+			const pdfOptions =
+				width && height
+					? {
+							path: file_path,
+							printBackground: true,
+							width: `${width / IMAGE_DPI}in`,
+							height: `${height / IMAGE_DPI}in`,
+					  }
+					: {
+							path: file_path,
+							printBackground: true,
+							format: "A4",
+					  };
 
 			await page.pdf(pdfOptions);
 			browser.close();
