@@ -4,7 +4,7 @@ import { use, useEffect, useState, useCallback, useRef } from "react";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import { BACK_HOST } from "@/lib/constants";
 import { useAuth } from "../../context/AuthContext";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
 import ReactCrop from "react-image-crop";
 import { DndContext, useDraggable, useDroppable } from "@dnd-kit/core";
 import * as pdfjsLib from "pdfjs-dist/build/pdf";
@@ -88,6 +88,14 @@ export default function PreviewPage({ params }) {
   const [hoverPatchId, setHoverPatchId] = useState(null);
   const [hoverHandle, setHoverHandle] = useState(null);
   const dragStateRef = useRef(null); // { id, startClientX, startClientY, origX, origY, overlayRect }
+  const [isErasing, setIsErasing] = useState(false);
+  const [isColorPickMode, setIsColorPickMode] = useState(false);
+  const [eraserColor, setEraserColor] = useState("#FFFFFF");
+  const [eraseRegions, setEraseRegions] = useState([]); // { id, page, x, y, relWidth, relHeight, color }
+  const eraseDragRef = useRef(false); // whether we're currently dragging in eraser mode
+  const [eraserThickness, setEraserThickness] = useState(20); // brush diameter in px
+  const eraseLastPointRef = useRef(null); // last brush position while dragging
+  const eraserCursorRef = useRef(null); // DOM element for visual eraser cursor
   const translatedOverlayRef = useRef(null);
   const originalImgRef = useRef(null);
   const translatedCanvasRef = useRef(null);
@@ -222,6 +230,19 @@ export default function PreviewPage({ params }) {
   };
 
   const handleDragEnd = (event) => {
+    if (isErasing) {
+      // Update cursor preview position even when not dragging
+      if (translatedOverlayRef.current) {
+        const overlayRect =
+          translatedOverlayRef.current.getBoundingClientRect();
+        const x = (event.clientX - overlayRect.left) / overlayRect.width;
+        const y = (event.clientY - overlayRect.top) / overlayRect.height;
+        setEraserCursorPos({ x, y });
+      }
+      return;
+    }
+
+    if (isColorPickMode) return;
     const { active, over } = event;
     if (!over || over.id !== "translated-drop-area") return;
 
@@ -272,6 +293,7 @@ export default function PreviewPage({ params }) {
   };
 
   const handlePatchMouseDown = (patchId, event, forcedHandle = null) => {
+    if (isErasing || isColorPickMode) return;
     event.preventDefault();
     event.stopPropagation();
     const overlayEl = translatedOverlayRef.current;
@@ -363,7 +385,124 @@ export default function PreviewPage({ params }) {
     setHoverHandle(handle);
   };
 
+  const handleOverlayMouseDown = (event) => {
+    if (!translatedOverlayRef.current) return;
+
+    // Color-pick mode: sample color from the underlying translated canvas
+    if (isColorPickMode && translatedCanvasRef.current) {
+      event.preventDefault();
+      const canvas = translatedCanvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) * canvas.width) / rect.width;
+      const y = ((event.clientY - rect.top) * canvas.height) / rect.height;
+      const ctx = canvas.getContext("2d");
+      try {
+        const data = ctx.getImageData(x, y, 1, 1).data;
+        const toHex = (v) => v.toString(16).padStart(2, "0");
+        const hex = `#${toHex(data[0])}${toHex(data[1])}${toHex(data[2])}`;
+        setEraserColor(hex);
+        setMessage(`Picked color ${hex} from translated page.`);
+      } catch (err) {
+        console.error("Error picking color from canvas:", err);
+        setMessage("Could not pick color at this position.");
+      }
+      setIsColorPickMode(false);
+      return;
+    }
+
+    // Eraser mode: start freehand drawing on the overlay
+    if (isErasing) {
+      event.preventDefault();
+      eraseDragRef.current = true;
+
+      const overlayRect = translatedOverlayRef.current.getBoundingClientRect();
+      const clamp01 = (v) => Math.max(0, Math.min(1, v));
+      const xNorm = clamp01(
+        (event.clientX - overlayRect.left) / overlayRect.width,
+      );
+      const yNorm = clamp01(
+        (event.clientY - overlayRect.top) / overlayRect.height,
+      );
+      if (eraserCursorRef.current) {
+        eraserCursorRef.current.style.left = `${xNorm * 100}%`;
+        eraserCursorRef.current.style.top = `${yNorm * 100}%`;
+      }
+      eraseLastPointRef.current = { x: xNorm, y: yNorm };
+
+      // First dab at mouse-down
+      const brushWidth = eraserThickness / overlayRect.width;
+      const brushHeight = eraserThickness / overlayRect.height;
+      const id = `erase-${translatedPage}-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 6)}`;
+      setEraseRegions((prev) => [
+        ...prev,
+        {
+          id,
+          page: translatedPage,
+          x: xNorm,
+          y: yNorm,
+          relWidth: brushWidth,
+          relHeight: brushHeight,
+          color: eraserColor,
+        },
+      ]);
+      return;
+    }
+  };
+
   const handleOverlayMouseMove = (event) => {
+    // Eraser mode: cursor should always follow the mouse; if dragging, also paint
+    if (isErasing && translatedOverlayRef.current) {
+      const overlayRect = translatedOverlayRef.current.getBoundingClientRect();
+      const clamp01 = (v) => Math.max(0, Math.min(1, v));
+      const xNorm = clamp01(
+        (event.clientX - overlayRect.left) / overlayRect.width,
+      );
+      const yNorm = clamp01(
+        (event.clientY - overlayRect.top) / overlayRect.height,
+      );
+      if (eraserCursorRef.current) {
+        eraserCursorRef.current.style.left = `${xNorm * 100}%`;
+        eraserCursorRef.current.style.top = `${yNorm * 100}%`;
+      }
+
+      // While dragging in eraser mode, add small "brush" regions along the path.
+      // Throttle by distance so we don't add too many and overload React.
+      if (eraseDragRef.current && event.buttons === 1) {
+        const last = eraseLastPointRef.current;
+        const dx = last ? xNorm - last.x : 0;
+        const dy = last ? yNorm - last.y : 0;
+        const distSq = dx * dx + dy * dy;
+        const MIN_DIST_SQ = 0.0002; // ~1.4% of page diagonal
+        if (last && distSq < MIN_DIST_SQ) {
+          return;
+        }
+
+        const brushWidth = eraserThickness / overlayRect.width;
+        const brushHeight = eraserThickness / overlayRect.height;
+        const id = `erase-${translatedPage}-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 6)}`;
+        setEraseRegions((prev) => [
+          ...prev,
+          {
+            id,
+            page: translatedPage,
+            x: xNorm,
+            y: yNorm,
+            relWidth: brushWidth,
+            relHeight: brushHeight,
+            color: eraserColor,
+          },
+        ]);
+        eraseLastPointRef.current = { x: xNorm, y: yNorm };
+      }
+      return;
+    }
+
+    if (isColorPickMode) return;
+
     const state = dragStateRef.current;
     if (!state) return;
     const dx = event.clientX - state.startClientX;
@@ -450,6 +589,10 @@ export default function PreviewPage({ params }) {
     dragStateRef.current = null;
     setHoverPatchId(null);
     setHoverHandle(null);
+    if (isErasing && eraseDragRef.current) {
+      eraseDragRef.current = false;
+      eraseLastPointRef.current = null;
+    }
   };
 
   const handleDownloadMerged = async () => {
@@ -466,6 +609,37 @@ export default function PreviewPage({ params }) {
       const pdfDoc = await PDFDocument.load(arrayBuffer);
       const pages = pdfDoc.getPages();
 
+      // First, draw erase regions (colored rectangles) so patches can sit on top
+      for (const region of eraseRegions) {
+        const pageIndex = (region.page || 1) - 1;
+        const page = pages[pageIndex];
+        if (!page) continue;
+
+        const pageWidth = page.getWidth();
+        const pageHeight = page.getHeight();
+
+        const width = region.relWidth * pageWidth;
+        const height = region.relHeight * pageHeight;
+        const centerX = region.x * pageWidth;
+        const centerYFromTop = region.y * pageHeight;
+        const x = centerX - width / 2;
+        const y = pageHeight - centerYFromTop - height / 2;
+
+        const colorHex = (region.color || "#FFFFFF").replace("#", "");
+        const r = parseInt(colorHex.slice(0, 2), 16) / 255;
+        const g = parseInt(colorHex.slice(2, 4), 16) / 255;
+        const b = parseInt(colorHex.slice(4, 6), 16) / 255;
+
+        page.drawRectangle({
+          x,
+          y,
+          width,
+          height,
+          color: rgb(r, g, b),
+        });
+      }
+
+      // Then, draw image patches on top
       for (const patch of placedPatches) {
         const pageIndex = (patch.page || 1) - 1;
         const page = pages[pageIndex];
@@ -658,10 +832,47 @@ export default function PreviewPage({ params }) {
                   <div
                     ref={translatedOverlayRef}
                     className="absolute inset-0"
+                    onMouseDown={handleOverlayMouseDown}
                     onMouseMove={handleOverlayMouseMove}
                     onMouseUp={handleOverlayMouseUp}
                     onMouseLeave={handleOverlayMouseUp}
+                    style={{
+                      cursor: isErasing ? "none" : isColorPickMode ? "crosshair" : "default",
+                    }}
                   >
+                    {/* Erase regions (visual overlay as freehand brush dabs) */}
+                    {eraseRegions
+                      .filter((r) => r.page === translatedPage)
+                      .map((r) => (
+                        <div
+                          key={r.id}
+                          className="absolute pointer-events-none"
+                          style={{
+                            left: `${r.x * 100}%`,
+                            top: `${r.y * 100}%`,
+                            width: `${r.relWidth * 100}%`,
+                            height: `${r.relHeight * 100}%`,
+                            transform: "translate(-50%, -50%)",
+                            backgroundColor: r.color || "#FFFFFF",
+                            opacity: 0.95,
+                            borderRadius: "9999px",
+                          }}
+                        />
+                      ))}
+                    {/* Eraser cursor preview (DOM-controlled for performance) */}
+                    {isErasing && (
+                      <div
+                        ref={eraserCursorRef}
+                        className="absolute pointer-events-none border-2 border-red-500 bg-red-200 bg-opacity-40 rounded-full"
+                        style={{
+                          left: "50%",
+                          top: "50%",
+                          width: `${eraserThickness}px`,
+                          height: `${eraserThickness}px`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                      />
+                    )}
                     {placedPatches
                       .filter((p) => p.page === translatedPage)
                       .map((p) => {
@@ -744,19 +955,110 @@ export default function PreviewPage({ params }) {
           </div>
 
           {/* Patch palette */}
-          <div className="mt-4 border rounded-lg p-2 bg-gray-50">
-            <div className="text-sm font-semibold text-gray-700 mb-1">
-              Patches (drag onto translated PDF):
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="border rounded-lg p-2 bg-gray-50">
+              <div className="text-sm font-semibold text-gray-700 mb-1">
+                Patches (drag onto translated PDF):
+              </div>
+              <div className="flex flex-wrap">
+                {patches.length === 0 && (
+                  <div className="text-xs text-gray-500">
+                    No patches yet. Crop an area from the original to create
+                    one.
+                  </div>
+                )}
+                {patches.map((p) => (
+                  <DraggablePatch key={p.id} patch={p} />
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap">
-              {patches.length === 0 && (
-                <div className="text-xs text-gray-500">
-                  No patches yet. Crop an area from the original to create one.
-                </div>
-              )}
-              {patches.map((p) => (
-                <DraggablePatch key={p.id} patch={p} />
-              ))}
+
+            {/* Eraser tools */}
+            <div className="border rounded-lg p-2 bg-gray-50">
+              <div className="text-sm font-semibold text-gray-700 mb-1">
+                Eraser (cover translated content):
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-gray-700">
+                <button
+                  type="button"
+                  className={`px-2 py-1 border rounded ${
+                    isErasing
+                      ? "bg-red-600 text-white border-red-600"
+                      : "border-red-400 text-red-600 hover:bg-red-50"
+                  }`}
+                  onClick={() => {
+                    setIsErasing((prev) => {
+                      const next = !prev;
+                      if (next) {
+                        // Initialize eraser cursor roughly at the center of the page
+                        if (eraserCursorRef.current) {
+                          eraserCursorRef.current.style.left = "50%";
+                          eraserCursorRef.current.style.top = "50%";
+                        }
+                        eraseLastPointRef.current = null;
+                      } else {
+                        if (eraserCursorRef.current) {
+                          eraserCursorRef.current.style.left = "-9999px";
+                          eraserCursorRef.current.style.top = "-9999px";
+                        }
+                        eraseLastPointRef.current = null;
+                      }
+                      return next;
+                    });
+                    setIsColorPickMode(false);
+                    setMessage(
+                      !isErasing
+                        ? "Eraser mode: drag on translated page to cover content."
+                        : "",
+                    );
+                  }}
+                >
+                  {isErasing ? "Eraser ON" : "Eraser OFF"}
+                </button>
+                <label className="flex items-center gap-1">
+                  <span>Thickness</span>
+                  <input
+                    type="range"
+                    min={6}
+                    max={80}
+                    step={2}
+                    value={eraserThickness}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      setEraserThickness(isNaN(v) ? 20 : v);
+                    }}
+                  />
+                  <span>{Math.round(eraserThickness)}px</span>
+                </label>
+                <label className="flex items-center gap-1">
+                  <span>Color</span>
+                  <input
+                    type="color"
+                    value={eraserColor}
+                    onChange={(e) => setEraserColor(e.target.value)}
+                    className="w-8 h-6 p-0 border rounded"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className={`px-2 py-1 border rounded ${
+                    isColorPickMode
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "border-blue-400 text-blue-600 hover:bg-blue-50"
+                  }`}
+                  onClick={() => {
+                    setIsColorPickMode((prev) => !prev);
+                    setIsErasing(false);
+                    setMessage(
+                      !isColorPickMode
+                        ? "Click on translated page to pick a color."
+                        : "",
+                    );
+                  }}
+                >
+                  Pick color from page
+                </button>
+              </div>
             </div>
           </div>
 
@@ -852,8 +1154,7 @@ export default function PreviewPage({ params }) {
             </div>
             <button
               onClick={handleDownloadMerged}
-              disabled={placedPatches.length === 0}
-              className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-40"
+              className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-700"
             >
               Download merged translated PDF
             </button>
