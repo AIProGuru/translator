@@ -23,17 +23,31 @@ const fileManagement = new FileManagementService();
  * These are useful in the HTML/preview, but should not appear in the final
  * translated PDF the user downloads.
  *
- * We match any element whose:
- *  - class contains "maria-signature" or "maria-image", OR
- *  - inline style contains a dotted border declaration.
+ * Strategy:
+ * 1) Remove elements whose:
+ *    - class contains "maria-signature" or "maria-image" or "placeholder", OR
+ *    - inline style contains any "dotted" border declaration.
+ * 2) As a safety net, neutralize any remaining dotted borders in CSS rules.
  */
 function stripPlaceholderRegions(html) {
 	if (!html) return html;
 
-	const placeholderRegex =
-		/<([a-zA-Z0-9]+)([^>]*(?:class=["'][^"']*maria-(?:signature|image)[^"']*["']|style=["'][^"']*border[^"']*dotted[^"']*["'])[^>]*)(?:>([\s\S]*?)<\/\1>|\/>)/gi;
+	// 1) Remove obvious placeholder elements entirely
+	const elementRegex =
+		/<([a-zA-Z0-9]+)([^>]*?(?:class=["'][^"']*(?:maria-(?:signature|image)|placeholder)[^"']*["']|style=["'][^"']*dotted[^"']*["'])[^>]*)(?:>([\s\S]*?)<\/\1>|\/>)/gi;
 
-	return html.replace(placeholderRegex, "");
+	let cleaned = html.replace(elementRegex, "");
+
+	// 2) Neutralize any remaining dotted borders in CSS (inside <style> blocks)
+	// so even if the LLM used a CSS class for dotted placeholders, they will
+	// no longer render in the final PDF.
+	cleaned = cleaned.replace(/border[^:;{]*:[^;{]*dotted[^;{]*;/gi, "border: none;");
+	cleaned = cleaned.replace(
+		/border-style\s*:\s*dotted[^;{]*;/gi,
+		"border-style: none;",
+	);
+
+	return cleaned;
 }
 
 router.post("/process-document", requireAuth, async (req, res) => {
