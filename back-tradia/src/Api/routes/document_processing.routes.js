@@ -8,12 +8,14 @@ const FileManagementService = require("../../Facades/services/documents/file_man
 const ProcessFacade = require("../../Facades/services/process");
 const Export = require("../../Facades/services/exports/export");
 const requireAuth = require("../../Facades/middleware/requireAuth");
+const PromptTemplateService = require("../../Facades/services/promptTemplates");
 
 const pdfParse = require("pdf-parse");
 const { LIMITS_PAGES } = require("../shared/config/constants");
 
 const router = express.Router();
 const facade = new DocumentProcessingFacade();
+const promptTemplateService = new PromptTemplateService();
 
 const processFacade = new ProcessFacade();
 const fileManagement = new FileManagementService();
@@ -67,15 +69,47 @@ router.post("/process-document", requireAuth, async (req, res) => {
 					.json({ error: "Error: autenticación fallida." });
 			}
 
+			const adapter = req.body?.adapter || "openai";
+			const customPrompt = req.body?.prompt || "";
+			const language = req.body?.language || "spanish";
+			const cycles = req.body?.cycles;
+			const documentTypeKey =
+				req.body?.documentTypeKey || req.body?.documentTypeId || "custom";
+			const customDocumentType =
+				(req.body?.customDocumentType || "Custom").toString().trim() ||
+				"Custom";
+
+			let dbTemplate = null;
+			if (documentTypeKey && documentTypeKey !== "custom") {
+				dbTemplate = await promptTemplateService.getByKey(documentTypeKey);
+			}
+
 			const translationConfig = {
-				adapter: req.body?.adapter || "openai",
-				prompt: req.body?.prompt || "",
-				language: req.body?.language || "spanish",
-				cycles: req.body?.cycles,
-				documentTypeId: req.body?.documentTypeId || "custom",
-				documentTypeLabel: req.body?.documentTypeLabel || "Custom",
-				documentTypeVersion: req.body?.documentTypeVersion || "1",
-				documentTypePrompt: req.body?.documentTypePrompt || "",
+				adapter,
+				prompt: customPrompt,
+				language,
+				cycles,
+				documentType: dbTemplate
+					? {
+							id: dbTemplate.id,
+							key: dbTemplate.key,
+							label: dbTemplate.label,
+							version: dbTemplate.version,
+							prompt: dbTemplate.prompt,
+							glossary: dbTemplate.glossary,
+							styleGuidance: dbTemplate.style_guidance,
+							examples: dbTemplate.examples || [],
+					  }
+					: {
+							id: null,
+							key: "custom",
+							label: customDocumentType,
+							version: 1,
+							prompt: "",
+							glossary: [],
+							styleGuidance: [],
+							examples: [],
+					  },
 			};
 
 			const filePath = req.file.path;

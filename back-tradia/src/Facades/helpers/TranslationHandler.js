@@ -142,18 +142,18 @@ class TranslationHandler {
 			0,
 		);
 		const documentType = this._buildDocumentTypeConfig(
-			config,
+			config.documentType,
 			previousTranslation.documentType,
 		);
 		const userPrompt = (
-			config.prompt ??
+			(config.prompt ?? null) ??
 			previousTranslation.prompt ??
 			""
 		).trim();
 		const templatePrompt =
-			(config.documentTypePrompt ||
-				documentType.prompt ||
-				"").trim();
+			previousTranslation.templatePrompt ||
+			documentType.prompt ||
+			"";
 		const mergedPrompt = this._mergePrompts(
 			templatePrompt,
 			userPrompt,
@@ -170,26 +170,21 @@ class TranslationHandler {
 		};
 	}
 
-	_buildDocumentTypeConfig(inputConfig = {}, fallback = {}) {
-		const safeFallback = fallback || {};
+	_buildDocumentTypeConfig(inputDocType = {}, fallback = {}) {
+		const source = inputDocType && Object.keys(inputDocType).length
+			? inputDocType
+			: fallback || {};
 		return {
-			id:
-				inputConfig.documentTypeId ||
-				safeFallback.id ||
-				"custom",
-			label:
-				inputConfig.documentTypeLabel ||
-				safeFallback.label ||
-				"Custom",
-			version: this._toInteger(
-				inputConfig.documentTypeVersion,
-				safeFallback.version,
-				1,
-			),
-			prompt:
-				inputConfig.documentTypePrompt ||
-				safeFallback.prompt ||
-				"",
+			id: source.id ?? null,
+			key: source.key || source.id || "custom",
+			label: source.label || "Custom",
+			version: this._toInteger(source.version, 1),
+			prompt: source.prompt || "",
+			glossary: Array.isArray(source.glossary) ? source.glossary : [],
+			styleGuidance: Array.isArray(source.styleGuidance)
+				? source.styleGuidance
+				: source.style_guidance || [],
+			examples: Array.isArray(source.examples) ? source.examples : [],
 		};
 	}
 

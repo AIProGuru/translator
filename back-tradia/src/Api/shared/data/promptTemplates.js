@@ -1,10 +1,11 @@
-export const defaultPromptTemplates = [
+module.exports = [
   {
-    id: "patents",
+    key: "patents",
     label: "Patents",
     description: "Patent filings, claims, abstracts, PCT responses.",
     version: 1,
-    prompt: `Act as a bilingual patent attorney. Translate the document preserving every claim number, reference numeral, and formal tone. Maintain "Claim" headings, section titles, and avoid interpreting inventive scope. For terms without a direct translation, keep the original term in parentheses.`,
+    prompt:
+      "Act as a bilingual patent attorney. Translate the document preserving every claim number, reference numeral, and formal tone. Maintain \"Claim\" headings, section titles, and avoid interpreting inventive scope. For terms without a direct translation, keep the original term in parentheses.",
     glossary: [
       { source: "claim", target: "reivindicación" },
       { source: "embodiment", target: "realización" },
@@ -30,11 +31,12 @@ export const defaultPromptTemplates = [
     ],
   },
   {
-    id: "customs",
+    key: "customs",
     label: "Customs",
     description: "Customs rulings, tariff classifications, import/export notices.",
     version: 1,
-    prompt: `You are a customs compliance specialist. Translate using trade, tariff, and logistics terminology. Cite HS codes exactly as written and keep measurement units. Maintain the formal notice tone.`,
+    prompt:
+      "You are a customs compliance specialist. Translate using trade, tariff, and logistics terminology. Cite HS codes exactly as written and keep measurement units. Maintain the formal notice tone.",
     glossary: [
       { source: "tariff heading", target: "partida arancelaria" },
       { source: "customs broker", target: "agente aduanal" },
@@ -62,11 +64,12 @@ export const defaultPromptTemplates = [
     ],
   },
   {
-    id: "contracts",
+    key: "contracts",
     label: "Contracts",
     description: "Commercial agreements, NDAs, service contracts.",
     version: 1,
-    prompt: `Translate as a contract lawyer. Preserve defined terms with consistent capitalization, mirror numbering, and keep shall/shall not constructions. Ensure the result can be executed without additional editing.`,
+    prompt:
+      "Translate as a contract lawyer. Preserve defined terms with consistent capitalization, mirror numbering, and keep shall/shall not constructions. Ensure the result can be executed without additional editing.",
     glossary: [
       { source: "hereinafter", target: "en lo sucesivo" },
       { source: "witnesseth", target: "atestigua" },
@@ -92,11 +95,12 @@ export const defaultPromptTemplates = [
     ],
   },
   {
-    id: "judgements",
+    key: "judgements",
     label: "Judgements",
     description: "Court decisions, appellate opinions, orders.",
     version: 1,
-    prompt: `Translate as a judicial translator. Keep citations intact, respect procedural terminology, and reflect the persuasive style of the issuing court. Maintain paragraph numbering and headings.`,
+    prompt:
+      "Translate as a judicial translator. Keep citations intact, respect procedural terminology, and reflect the persuasive style of the issuing court. Maintain paragraph numbering and headings.",
     glossary: [
       { source: "holding", target: "fallo" },
       { source: "obiter dictum", target: "obiter dictum" },
@@ -110,8 +114,7 @@ export const defaultPromptTemplates = [
     ],
     examples: [
       {
-        source:
-          "The Court hereby grants the preliminary injunction requested by the Plaintiff.",
+        source: "The Court hereby grants the preliminary injunction requested by the Plaintiff.",
         translation:
           "El Tribunal concede por la presente la medida cautelar preliminar solicitada por la Parte Actora.",
       },
@@ -123,11 +126,12 @@ export const defaultPromptTemplates = [
     ],
   },
   {
-    id: "administrative",
+    key: "administrative",
     label: "Administrative",
     description: "Administrative rulings, agency notices, compliance reports.",
     version: 1,
-    prompt: `You are translating administrative determinations. Emphasize procedural clarity, cite regulations verbatim, and keep the neutral bureaucratic tone. Highlight deadlines and obligations as in the source.`,
+    prompt:
+      "You are translating administrative determinations. Emphasize procedural clarity, cite regulations verbatim, and keep the neutral bureaucratic tone. Highlight deadlines and obligations as in the source.",
     glossary: [
       { source: "filing", target: "presentación" },
       { source: "notice of deficiency", target: "requerimiento por deficiencia" },
@@ -153,11 +157,12 @@ export const defaultPromptTemplates = [
     ],
   },
   {
-    id: "trademarks",
+    key: "trademarks",
     label: "Trademarks",
     description: "Trademark applications, office actions, oppositions.",
     version: 1,
-    prompt: `Translate as an IP specialist focused on marks. Preserve mark spellings, Nice classes, and examiner references. Keep persuasive tone when addressing office actions.`,
+    prompt:
+      "Translate as an IP specialist focused on marks. Preserve mark spellings, Nice classes, and examiner references. Keep persuasive tone when addressing office actions.",
     glossary: [
       { source: "specimen", target: "muestra de uso" },
       { source: "likelihood of confusion", target: "probabilidad de confusión" },

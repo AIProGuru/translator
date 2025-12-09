@@ -3,6 +3,7 @@ const app = express();
 const cors = require("cors");
 const documentProcessing = require("./Api/routes/document_processing.routes");
 const processRoutes = require("./Api/routes/process.routes");
+const promptTemplateRoutes = require("./Api/routes/prompt_templates.routes");
 const requireAuth = require("./Facades/middleware/auth.middleware");
 const authenticate = require("./Api/routes/auth.routes");
 const passport = require("passport");
@@ -29,6 +30,7 @@ app.use(passport.initialize());
 
 app.use("/api", documentProcessing);
 app.use("/api", processRoutes);
+app.use("/api", promptTemplateRoutes);
 app.use("/api/auth", authenticate);
 
 app.get("/protected", requireAuth, (req, res) => {

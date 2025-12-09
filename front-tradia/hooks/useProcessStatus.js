@@ -2,7 +2,7 @@
 
 import { BACK_HOST } from "@/lib/constants";
 import { useEffect, useState } from "react";
-import { useAuth } from "../app/context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 
 export const useProcessStatus = (processId) => {
     const [status, setStatus] = useState("pending");

@@ -1,7 +1,7 @@
 "use client";
 
 import ServerErrorModal from "@/components/ServerErrorModal";
-import { useServerError } from "../app/context/ServerErrorContext";
+import { useServerError } from "../context/ServerErrorContext";
 
 export default function GlobalModals() {
   const { serverError, setServerError } = useServerError();

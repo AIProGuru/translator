@@ -3,7 +3,7 @@
 import { use, useEffect, useState, useCallback, useRef } from "react";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import { BACK_HOST } from "@/lib/constants";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import ReactCrop from "react-image-crop";
 import { DndContext, DragOverlay, useDraggable, useDroppable } from "@dnd-kit/core";

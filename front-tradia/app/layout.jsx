@@ -1,8 +1,8 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "./context/AuthContext";
-import { ServerErrorProvider } from "./context/ServerErrorContext";
-import { PromptTemplateProvider } from "./context/PromptTemplateContext";
+import { AuthProvider } from "../context/AuthContext";
+import { ServerErrorProvider } from "../context/ServerErrorContext";
+import { PromptTemplateProvider } from "../context/PromptTemplateContext";
 import GlobalModals from "../components/GlobalModals";
 
 const inter = Inter({ subsets: ["latin"] });

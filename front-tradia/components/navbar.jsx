@@ -1,7 +1,9 @@
+"use client";
+
 import Link from "next/link";
-import styles from "../styles/navbar.module.css";
-import { useAuth } from "@/app/context/AuthContext";
 import Image from "next/image";
+import styles from "../styles/navbar.module.css";
+import { useAuth } from "../context/AuthContext";
 
 const Navbar = () => {
   const { logout, user } = useAuth();
@@ -14,7 +16,7 @@ const Navbar = () => {
           width={50}
           height={50}
         />
-        <Link href="#">Amigo Translations</Link>
+        <Link href="/">Amigo Translations</Link>
       </div>
       <ul className={styles.menu}>
         <li>

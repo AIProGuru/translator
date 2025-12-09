@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { usePromptTemplates } from "@/app/context/PromptTemplateContext";
+import { usePromptTemplates } from "../context/PromptTemplateContext";
 
 const adapters = [
   { value: "openai", label: "OpenAI" },
@@ -64,54 +64,60 @@ export default function AdvancedSettings({
   setPrompt,
   cycles,
   setCycles,
-  documentTypeId,
-  setDocumentTypeId,
+  documentTypeKey,
+  setDocumentTypeKey,
   customDocumentType,
   setCustomDocumentType,
 }) {
-  const { templates, isReady } = usePromptTemplates();
-  const [comparisonTargetId, setComparisonTargetId] = useState("");
+  const { templates, isReady, isLoading, lastError } = usePromptTemplates();
+  const [comparisonTargetKey, setComparisonTargetKey] = useState("");
   const lastAppliedTemplateRef = useRef(null);
 
-  useEffect(() => {
-    if (!templates.length || documentTypeId === "custom") return;
-    const exists = templates.some((template) => template.id === documentTypeId);
-    if (!exists) {
-      setDocumentTypeId(templates[0].id);
-    }
-  }, [templates, documentTypeId, setDocumentTypeId]);
-
+  const effectiveDocumentTypeKey = documentTypeKey ?? "custom";
   const selectedTemplate =
-    documentTypeId && documentTypeId !== "custom"
-      ? templates.find((template) => template.id === documentTypeId)
+    effectiveDocumentTypeKey !== "custom"
+      ? templates.find((template) => template.key === effectiveDocumentTypeKey)
       : null;
 
   useEffect(() => {
+    if (!templates.length) return;
+    if (!documentTypeKey) {
+      setDocumentTypeKey(templates[0].key);
+      return;
+    }
+    if (documentTypeKey === "custom") return;
+    const exists = templates.some((template) => template.key === documentTypeKey);
+    if (!exists) {
+      setDocumentTypeKey(templates[0].key);
+    }
+  }, [templates, documentTypeKey, setDocumentTypeKey]);
+
+  useEffect(() => {
     if (!isReady) return;
-    if (!comparisonTargetId || comparisonTargetId === documentTypeId) {
-      const fallback = templates.find((template) => template.id !== documentTypeId);
+    if (!comparisonTargetKey || comparisonTargetKey === effectiveDocumentTypeKey) {
+      const fallback = templates.find((template) => template.key !== effectiveDocumentTypeKey);
       if (fallback) {
-        setComparisonTargetId(fallback.id);
+        setComparisonTargetKey(fallback.key);
       }
     }
-  }, [comparisonTargetId, documentTypeId, isReady, templates]);
+  }, [comparisonTargetKey, effectiveDocumentTypeKey, isReady, templates]);
 
   useEffect(() => {
     if (!selectedTemplate) return;
-    if (lastAppliedTemplateRef.current === selectedTemplate.id) return;
+    if (lastAppliedTemplateRef.current === selectedTemplate.key) return;
     setPrompt(selectedTemplate.prompt);
-    lastAppliedTemplateRef.current = selectedTemplate.id;
+    lastAppliedTemplateRef.current = selectedTemplate.key;
   }, [selectedTemplate, setPrompt]);
 
   const comparisonTemplate =
-    comparisonTargetId && comparisonTargetId !== documentTypeId
-      ? templates.find((template) => template.id === comparisonTargetId)
+    comparisonTargetKey && comparisonTargetKey !== effectiveDocumentTypeKey
+      ? templates.find((template) => template.key === comparisonTargetKey)
       : null;
 
   const templateOptions = useMemo(
     () =>
       templates.map((template) => ({
-        value: template.id,
+        value: template.key,
         label: template.label,
       })),
     [templates],
@@ -120,8 +126,10 @@ export default function AdvancedSettings({
   const applyTemplatePrompt = () => {
     if (!selectedTemplate) return;
     setPrompt(selectedTemplate.prompt);
-    lastAppliedTemplateRef.current = selectedTemplate.id;
+    lastAppliedTemplateRef.current = selectedTemplate.key;
   };
+
+  const isTemplateSelectionDisabled = !isReady || !templates.length;
 
   return (
     <motion.div
@@ -131,6 +139,11 @@ export default function AdvancedSettings({
       transition={{ duration: 0.3 }}
       className="mt-4 p-4 bg-blue-50 rounded-lg space-y-6"
     >
+      {lastError && (
+        <div className="p-2 text-sm text-red-700 bg-red-100 border border-red-200 rounded">
+          Could not load shared templates. You can still use a custom prompt.
+        </div>
+      )}
       <div className="grid md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="adapter" className="block text-sm font-medium text-blue-800 mb-1">
@@ -156,14 +169,15 @@ export default function AdvancedSettings({
           </label>
           <select
             id="document-type"
-            value={documentTypeId}
+            value={effectiveDocumentTypeKey}
             onChange={(e) => {
               const nextValue = e.target.value;
-              setDocumentTypeId(nextValue);
+              setDocumentTypeKey(nextValue);
               if (nextValue !== "custom") {
                 setCustomDocumentType("");
               }
             }}
+            disabled={isTemplateSelectionDisabled}
             className="w-full p-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white"
           >
             {templateOptions.map((option) => (
@@ -173,7 +187,7 @@ export default function AdvancedSettings({
             ))}
             <option value="custom">Other / Custom</option>
           </select>
-          {documentTypeId === "custom" && (
+          {documentTypeKey === "custom" && (
             <input
               type="text"
               value={customDocumentType}
@@ -210,7 +224,7 @@ export default function AdvancedSettings({
               {selectedTemplate.styleGuidance?.length ? (
                 <ul className="list-disc list-inside text-xs text-gray-700 space-y-1 max-h-32 overflow-y-auto pr-1">
                   {selectedTemplate.styleGuidance.map((item, index) => (
-                    <li key={`${selectedTemplate.id}-style-${index}`}>{item}</li>
+                    <li key={`${selectedTemplate.key}-style-${index}`}>{item}</li>
                   ))}
                 </ul>
               ) : (
@@ -262,13 +276,14 @@ export default function AdvancedSettings({
             Compare terminology with another type
           </label>
           <select
-            value={comparisonTargetId}
-            onChange={(e) => setComparisonTargetId(e.target.value)}
+            value={comparisonTargetKey}
+            onChange={(e) => setComparisonTargetKey(e.target.value)}
             className="w-full p-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 bg-white"
+            disabled={isTemplateSelectionDisabled}
           >
             <option value="">Select document type</option>
             {templateOptions
-              .filter((option) => option.value !== documentTypeId)
+              .filter((option) => option.value !== effectiveDocumentTypeKey)
               .map((option) => (
                 <option key={`comparison-${option.value}`} value={option.value}>
                   {option.label}
@@ -287,7 +302,9 @@ export default function AdvancedSettings({
           title={
             comparisonTemplate
               ? `${comparisonTemplate.label} reference`
-              : "Select a type to compare"
+              : isLoading
+                ? "Loading templates..."
+                : "Select a type to compare"
           }
           template={comparisonTemplate}
         />

@@ -1,6 +1,6 @@
 'use client';
 import { useState, useCallback } from 'react';
-import { useAuth } from "../app/context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 
 export function useSafeFetch() {
   const [serverError, setServerError] = useState(false);
@@ -15,6 +15,9 @@ export function useSafeFetch() {
         mergedOptions.headers = {
           ...(options.headers || {}),
         };
+        if (!mergedOptions.credentials) {
+          mergedOptions.credentials = "include";
+        }
 
         if (token) {
           mergedOptions.headers["Authorization"] = `Bearer ${token}`;

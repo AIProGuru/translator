@@ -9,8 +9,8 @@ import AdvancedSettings from "@/components/advanced-settings";
 import ProcessList from "@/components/process-list";
 import { FRONT_HOST, BACK_HOST } from "@/lib/constants";
 import ESTIMATED_TIME_PER_PAGE from "@/lib/models";
-import { useAuth } from "../context/AuthContext";
-import { usePromptTemplates } from "../context/PromptTemplateContext";
+import { useAuth } from "../../context/AuthContext";
+import { usePromptTemplates } from "../../context/PromptTemplateContext";
 import Navbar from "../../components/navbar";
 import ServerErrorModal from "@/components/ServerErrorModal";
 import { useSafeFetch } from "@/hooks/useSafeFetch";
@@ -24,7 +24,7 @@ export default function Home() {
     const [adapter, setAdapter] = useState("openai");
   const [prompt, setPrompt] = useState("");
   const [cycles, setCycles] = useState(1);
-  const [documentTypeId, setDocumentTypeId] = useState("patents");
+  const [documentTypeKey, setDocumentTypeKey] = useState(null);
   const [customDocumentType, setCustomDocumentType] = useState("");
   const [processes, setProcesses] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -44,6 +44,12 @@ export default function Home() {
         }
     }, [user, isLoading]);
 
+    useEffect(() => {
+        if (!documentTypeKey && templates.length) {
+            setDocumentTypeKey(templates[0].key);
+        }
+    }, [documentTypeKey, templates]);
+
     const fetchProcesses = async () => {
         try {
             const response = await safeFetch(`${BACK_HOST}/api/processes`, {
@@ -62,14 +68,15 @@ export default function Home() {
     if (!file) return;
 
     setIsUploading(true);
+    const templateKey = documentTypeKey || "custom";
     const selectedTemplate =
-      documentTypeId && documentTypeId !== "custom"
-        ? templates.find((tpl) => tpl.id === documentTypeId)
+      templateKey !== "custom"
+        ? templates.find((tpl) => tpl.key === templateKey)
         : null;
     const documentTypeLabel =
-      documentTypeId === "custom"
+      templateKey === "custom"
         ? customDocumentType.trim() || "Custom"
-        : selectedTemplate?.label || documentTypeId;
+        : selectedTemplate?.label || templateKey;
 
     const formData = new FormData();
     formData.append("pdf", file);
@@ -77,10 +84,8 @@ export default function Home() {
     formData.append("prompt", prompt);
     formData.append("language", language);
     formData.append("cycles", cycles);
-    formData.append("documentTypeId", documentTypeId || "custom");
-    formData.append("documentTypeLabel", documentTypeLabel);
-    formData.append("documentTypeVersion", selectedTemplate?.version?.toString() || "1");
-    formData.append("documentTypePrompt", selectedTemplate?.prompt || prompt);
+    formData.append("documentTypeKey", templateKey);
+    formData.append("customDocumentType", documentTypeLabel);
 
     try {
             const response = await safeFetch(`${BACK_HOST}/api/process-document`, {
@@ -179,8 +184,8 @@ export default function Home() {
                                         setPrompt={setPrompt}
                                         cycles={cycles}
                                         setCycles={setCycles}
-                                        documentTypeId={documentTypeId}
-                                        setDocumentTypeId={setDocumentTypeId}
+                                        documentTypeKey={documentTypeKey}
+                                        setDocumentTypeKey={setDocumentTypeKey}
                                         customDocumentType={customDocumentType}
                                         setCustomDocumentType={setCustomDocumentType}
                                     />

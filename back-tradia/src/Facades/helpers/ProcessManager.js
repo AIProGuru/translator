@@ -23,18 +23,25 @@ class ProcessManager {
 
 	async createProcessRecord(file, userId, translationConfig = {}) {
 		const safeCycles = Number.parseInt(translationConfig.cycles, 10);
+		const docType = translationConfig.documentType || {};
+		const normalizedDocumentType = {
+			id: docType.id ?? null,
+			key: docType.key || docType.id || "custom",
+			label: docType.label || "Custom",
+			version: parseInt(docType.version, 10) || 1,
+			prompt: docType.prompt || "",
+			glossary: Array.isArray(docType.glossary) ? docType.glossary : [],
+			styleGuidance: Array.isArray(docType.styleGuidance)
+				? docType.styleGuidance
+				: [],
+		};
+
 		const normalizedTranslationConfig = {
 			adapter: translationConfig.adapter || "openai",
 			language: translationConfig.language || "spanish",
 			cycles: Number.isNaN(safeCycles) ? 0 : safeCycles,
 			prompt: translationConfig.prompt || "",
-			documentType: {
-				id: translationConfig.documentTypeId || "custom",
-				label: translationConfig.documentTypeLabel || "Custom",
-				version:
-					parseInt(translationConfig.documentTypeVersion, 10) || 1,
-				prompt: translationConfig.documentTypePrompt || "",
-			},
+			documentType: normalizedDocumentType,
 		};
 
 		return await this._processFacade.createProcess({

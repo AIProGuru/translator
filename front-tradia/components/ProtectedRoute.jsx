@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "../app/context/AuthContext"; // Ajusta la ruta según dónde esté tu AuthContext
+import { useAuth } from "../context/AuthContext"; // Ajusta la ruta según dónde esté tu AuthContext
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 

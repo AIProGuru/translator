@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { BACK_HOST } from "@/lib/constants";
 import ConfirmModal from "../components/ConfirmModal";
-import { useAuth } from "../app/context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 
 const ITEMS_PER_PAGE = 6;
 

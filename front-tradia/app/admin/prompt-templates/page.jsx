@@ -3,10 +3,11 @@
 import { useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/navbar";
-import { usePromptTemplates } from "@/app/context/PromptTemplateContext";
+import { usePromptTemplates } from "../../../context/PromptTemplateContext";
 
 const emptyForm = {
   id: "",
+  key: "",
   label: "",
   description: "",
   prompt: "",
@@ -17,6 +18,7 @@ const emptyForm = {
 
 const templateToForm = (template) => ({
   id: template.id,
+  key: template.key,
   label: template.label,
   description: template.description || "",
   prompt: template.prompt || "",
@@ -31,6 +33,7 @@ const templateToForm = (template) => ({
 
 const formToTemplate = (form) => ({
   id: form.id,
+  key: form.key.trim(),
   label: form.label.trim(),
   description: form.description.trim(),
   prompt: form.prompt.trim(),
@@ -55,32 +58,49 @@ const formToTemplate = (form) => ({
 });
 
 export default function PromptTemplateAdminPage() {
-  const { templates, addTemplate, updateTemplate, removeTemplate, resetTemplates } =
-    usePromptTemplates();
+  const {
+    templates,
+    addTemplate,
+    updateTemplate,
+    removeTemplate,
+    resetTemplates,
+    isLoading,
+  } = usePromptTemplates();
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const startEditing = (template) => {
+    setErrorMessage("");
     setEditingId(template?.id || "new");
     setForm(template ? templateToForm(template) : { ...emptyForm, id: "" });
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     if (!form.label.trim()) return;
-    const prepared = formToTemplate(form);
-    if (editingId && editingId !== "new") {
-      updateTemplate(editingId, prepared);
-    } else {
-      addTemplate(prepared);
+    setErrorMessage("");
+    try {
+      const prepared = formToTemplate(form);
+      if (editingId && editingId !== "new") {
+        await updateTemplate(editingId, prepared);
+      } else {
+        await addTemplate(prepared);
+      }
+      setEditingId(null);
+      setForm(emptyForm);
+    } catch (error) {
+      setErrorMessage(error.message);
     }
-    setEditingId(null);
-    setForm(emptyForm);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm("Delete this template? This cannot be undone.")) {
-      removeTemplate(id);
+      try {
+        await removeTemplate(id);
+      } catch (error) {
+        setErrorMessage(error.message);
+      }
     }
   };
 
@@ -105,7 +125,14 @@ export default function PromptTemplateAdminPage() {
             </button>
             <button
               type="button"
-              onClick={() => resetTemplates()}
+              onClick={async () => {
+                setErrorMessage("");
+                try {
+                  await resetTemplates();
+                } catch (error) {
+                  setErrorMessage(error.message);
+                }
+              }}
               className="px-4 py-2 text-sm font-semibold border border-blue-300 rounded text-blue-700 hover:bg-blue-50"
             >
               Restore defaults
@@ -124,8 +151,9 @@ export default function PromptTemplateAdminPage() {
                 <div>
                   <p className="text-base font-semibold text-gray-800">{template.label}</p>
                   <p className="text-xs text-gray-500">{template.description}</p>
+                  <p className="text-[11px] text-gray-400">Key: {template.key}</p>
                   <p className="text-[11px] text-gray-400 mt-1">
-                    Glossary terms: {template.glossary.length} • Examples: {template.examples.length}
+                    Glossary terms: {template.glossary?.length ?? 0} • Examples: {template.examples?.length ?? 0}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -146,9 +174,10 @@ export default function PromptTemplateAdminPage() {
                 </div>
               </div>
             ))}
-            {!templates.length && (
+            {!templates.length && !isLoading && (
               <p className="text-sm text-gray-500">No templates configured. Add the first one above.</p>
             )}
+            {isLoading && <p className="text-sm text-gray-500">Loading templates...</p>}
           </div>
         </section>
 
@@ -170,6 +199,11 @@ export default function PromptTemplateAdminPage() {
               </button>
             </div>
             <form className="space-y-4" onSubmit={handleSubmit}>
+              {errorMessage && (
+                <div className="p-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded">
+                  {errorMessage}
+                </div>
+              )}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-700">Label</label>
@@ -182,13 +216,14 @@ export default function PromptTemplateAdminPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Internal ID (optional)</label>
+                  <label className="text-sm font-medium text-gray-700">Unique key (no spaces)</label>
                   <input
                     type="text"
-                    value={form.id}
-                    onChange={(e) => setForm((prev) => ({ ...prev, id: e.target.value }))}
+                    value={form.key}
+                    onChange={(e) => setForm((prev) => ({ ...prev, key: e.target.value }))}
                     className="mt-1 w-full border rounded px-3 py-2"
-                    placeholder="auto-generated if left blank"
+                    placeholder="e.g. patents, customs, contracts..."
+                    required={editingId === "new"}
                   />
                 </div>
               </div>
