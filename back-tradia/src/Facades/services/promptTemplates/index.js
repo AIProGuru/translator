@@ -4,6 +4,7 @@ const defaultTemplates = require("../../../Api/shared/data/promptTemplates");
 class PromptTemplateService {
   constructor() {
     this.repository = new PromptTemplateRepository();
+    this._seedPromise = null;
   }
 
   async listAll({ ensureSeed = false } = {}) {
@@ -16,11 +17,21 @@ class PromptTemplateService {
   }
 
   async seedDefaults() {
+    if (!this._seedPromise) {
+      this._seedPromise = this._performSeed().finally(() => {
+        this._seedPromise = null;
+      });
+    }
+    await this._seedPromise;
+    return this.repository.findAll();
+  }
+
+  async _performSeed() {
     await this.repository.deleteAll();
     for (const template of defaultTemplates) {
-      await this.repository.create(template);
+      const payload = this.normalizePayload(template);
+      await this.repository.create(payload);
     }
-    return this.repository.findAll();
   }
 
   async getById(id) {

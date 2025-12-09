@@ -38,7 +38,11 @@ class PromptTemplateRepository {
   }
 
   async deleteAll() {
-    return PromptTemplate.destroy({ where: {} });
+    return PromptTemplate.destroy({
+      where: {},
+      truncate: true,
+      cascade: true,
+    });
   }
 }
 
