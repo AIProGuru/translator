@@ -25,9 +25,11 @@ class ProcessFacade {
 
 	async createProcess(processData) {
 		return await this.processRepository.create({
-			name: processData.name,
-			description: processData.description,
-			status: "pending",
+			slug: processData.slug,
+			status: processData.status,
+			message: processData.message,
+			startTime: processData.startTime,
+			config: processData.config,
 			userId: processData.userId,
 		});
 	}

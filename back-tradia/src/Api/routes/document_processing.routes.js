@@ -67,6 +67,17 @@ router.post("/process-document", requireAuth, async (req, res) => {
 					.json({ error: "Error: autenticación fallida." });
 			}
 
+			const translationConfig = {
+				adapter: req.body?.adapter || "openai",
+				prompt: req.body?.prompt || "",
+				language: req.body?.language || "spanish",
+				cycles: req.body?.cycles,
+				documentTypeId: req.body?.documentTypeId || "custom",
+				documentTypeLabel: req.body?.documentTypeLabel || "Custom",
+				documentTypeVersion: req.body?.documentTypeVersion || "1",
+				documentTypePrompt: req.body?.documentTypePrompt || "",
+			};
+
 			const filePath = req.file.path;
 			const fileData = await fs.promises.readFile(filePath);
 
@@ -83,6 +94,7 @@ router.post("/process-document", requireAuth, async (req, res) => {
 			const process = await facade._processManager.createProcessRecord(
 				req.file,
 				userId,
+				translationConfig,
 			);
 			req.process = process;
 

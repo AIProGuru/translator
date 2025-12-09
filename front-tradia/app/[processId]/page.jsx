@@ -230,27 +230,33 @@ export default function ProcessPage({ params }) {
                 </div>
 
                 {/* Botones */}
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleDownload}
-                  disabled={isDownloading || status === "error"}
-                  className={`py-3 px-8 ${
-                    isDownloading || status === "error"
-                      ? "bg-blue-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700"
-                  } text-white font-semibold rounded-lg shadow-lg transition-colors duration-300`}
-                >
-                  {isDownloading ? "Downloading..." : "Download Document"}
-                </motion.button>
-                <div className="mt-4">
-                  <button
-                    type="button"
+                <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={handlePreview}
-                    className="text-blue-600 hover:text-blue-800 underline"
+                    disabled={status === "error"}
+                    className={`py-3 px-6 ${
+                      status === "error"
+                        ? "bg-gray-400 cursor-not-allowed"
+                        : "bg-green-600 hover:bg-green-700"
+                    } text-white font-semibold rounded-lg shadow-lg transition-colors duration-300`}
                   >
-                    Preview original vs translated PDF
-                  </button>
+                    Preview & Edit
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleDownload}
+                    disabled={isDownloading || status === "error"}
+                    className={`py-3 px-6 ${
+                      isDownloading || status === "error"
+                        ? "bg-blue-400 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-700"
+                    } text-white font-semibold rounded-lg shadow-lg transition-colors duration-300`}
+                  >
+                    {isDownloading ? "Downloading..." : "Download"}
+                  </motion.button>
                 </div>
                 {showServerErrorModal && (
                   <ServerErrorModal

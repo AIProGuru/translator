@@ -34,10 +34,12 @@ class ProcessRepository {
 			const newProcess = await Process.create({
 				slug: data.slug || `process-${Date.now()}`,
 				status: data.status || "pending",
-				metadata: data.metadata || { errors: [] },
-				userId: data.userId, 
+				message: data.message || null,
+				startTime: data.startTime || new Date(),
+				config: data.config || {},
+				userId: data.userId,
 			});
-			
+
 			return newProcess;
 		} catch (error) {
 			throw new Error(`Error al crear el proceso: ${error.message}`);

@@ -10,6 +10,7 @@ import ProcessList from "@/components/process-list";
 import { FRONT_HOST, BACK_HOST } from "@/lib/constants";
 import ESTIMATED_TIME_PER_PAGE from "@/lib/models";
 import { useAuth } from "../context/AuthContext";
+import { usePromptTemplates } from "../context/PromptTemplateContext";
 import Navbar from "../../components/navbar";
 import ServerErrorModal from "@/components/ServerErrorModal";
 import { useSafeFetch } from "@/hooks/useSafeFetch";
@@ -21,12 +22,15 @@ export default function Home() {
     const [language, setLanguage] = useState("spanish");
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [adapter, setAdapter] = useState("openai");
-    const [prompt, setPrompt] = useState("");
-    const [cycles, setCycles] = useState(1);
-    const [processes, setProcesses] = useState([]);
-    const [isUploading, setIsUploading] = useState(false);
-    const { user, isLoading } = useAuth();
-    const { safeFetch, serverError, setServerError } = useSafeFetch();
+  const [prompt, setPrompt] = useState("");
+  const [cycles, setCycles] = useState(1);
+  const [documentTypeId, setDocumentTypeId] = useState("patents");
+  const [customDocumentType, setCustomDocumentType] = useState("");
+  const [processes, setProcesses] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const { user, isLoading } = useAuth();
+  const { safeFetch, serverError, setServerError } = useSafeFetch();
+  const { templates } = usePromptTemplates();
 
     useEffect(() => {
         if (isLoading) {
@@ -54,18 +58,31 @@ export default function Home() {
         }
     };
 
-    const handleUpload = async () => {
-        if (!file) return;
+  const handleUpload = async () => {
+    if (!file) return;
 
-        setIsUploading(true);
-        const formData = new FormData();
-        formData.append("pdf", file);
-        formData.append("adapter", adapter);
-        formData.append("prompt", prompt);
-        formData.append("language", language);
-        formData.append("cycles", cycles);
+    setIsUploading(true);
+    const selectedTemplate =
+      documentTypeId && documentTypeId !== "custom"
+        ? templates.find((tpl) => tpl.id === documentTypeId)
+        : null;
+    const documentTypeLabel =
+      documentTypeId === "custom"
+        ? customDocumentType.trim() || "Custom"
+        : selectedTemplate?.label || documentTypeId;
 
-        try {
+    const formData = new FormData();
+    formData.append("pdf", file);
+    formData.append("adapter", adapter);
+    formData.append("prompt", prompt);
+    formData.append("language", language);
+    formData.append("cycles", cycles);
+    formData.append("documentTypeId", documentTypeId || "custom");
+    formData.append("documentTypeLabel", documentTypeLabel);
+    formData.append("documentTypeVersion", selectedTemplate?.version?.toString() || "1");
+    formData.append("documentTypePrompt", selectedTemplate?.prompt || prompt);
+
+    try {
             const response = await safeFetch(`${BACK_HOST}/api/process-document`, {
                 method: "POST",
                 body: formData,
@@ -162,6 +179,10 @@ export default function Home() {
                                         setPrompt={setPrompt}
                                         cycles={cycles}
                                         setCycles={setCycles}
+                                        documentTypeId={documentTypeId}
+                                        setDocumentTypeId={setDocumentTypeId}
+                                        customDocumentType={customDocumentType}
+                                        setCustomDocumentType={setCustomDocumentType}
                                     />
                                 )}
                             </div>

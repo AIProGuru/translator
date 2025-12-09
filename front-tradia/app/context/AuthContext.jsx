@@ -4,7 +4,13 @@ import { useRouter } from "next/navigation";
 import { BACK_HOST } from "../../lib/constants.js";
 import { useServerError } from "./ServerErrorContext"; 
 
-const AuthContext = createContext();
+const AuthContext = createContext({
+  user: null,
+  token: null,
+  login: async () => {},
+  logout: async () => {},
+  isLoading: true,
+});
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -88,4 +94,10 @@ export function AuthProvider({ children }) {
   );
 }
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => useContext(AuthContext) ?? {
+  user: null,
+  token: null,
+  login: async () => {},
+  logout: async () => {},
+  isLoading: true,
+};

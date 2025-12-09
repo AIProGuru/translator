@@ -21,7 +21,22 @@ class ProcessManager {
 		return { process, processPath, file: req.file };
 	}
 
-	async createProcessRecord(file,userId) {
+	async createProcessRecord(file, userId, translationConfig = {}) {
+		const safeCycles = Number.parseInt(translationConfig.cycles, 10);
+		const normalizedTranslationConfig = {
+			adapter: translationConfig.adapter || "openai",
+			language: translationConfig.language || "spanish",
+			cycles: Number.isNaN(safeCycles) ? 0 : safeCycles,
+			prompt: translationConfig.prompt || "",
+			documentType: {
+				id: translationConfig.documentTypeId || "custom",
+				label: translationConfig.documentTypeLabel || "Custom",
+				version:
+					parseInt(translationConfig.documentTypeVersion, 10) || 1,
+				prompt: translationConfig.documentTypePrompt || "",
+			},
+		};
+
 		return await this._processFacade.createProcess({
 			userId:userId,
 			slug: `Proceso-de-${Date.now()}`,
@@ -31,7 +46,9 @@ class ProcessManager {
 				originalFilename: file.originalname,
 				fileSize: file.size,
 				mimeType: file.mimetype,
+				translation: normalizedTranslationConfig,
 			},
+			message: "Queued for translation",
 		});
 	}
 
