@@ -29,11 +29,11 @@ app.use(refreshToken);
 app.use(passport.initialize());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/api/auth", authenticate);
 app.use("/api", documentProcessing);
 app.use("/api", processRoutes);
 app.use("/api", promptTemplateRoutes);
 app.use("/api", userRoutes);
-app.use("/api/auth", authenticate);
 
 app.get("/protected", requireAuth, (req, res) => {
     res.json({ message: "Ruta protegida", user: req.user });
