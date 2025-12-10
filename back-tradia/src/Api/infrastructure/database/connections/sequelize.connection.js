@@ -35,7 +35,7 @@ class DatabaseConnection {
 
     async syncModels() {
         try {
-            await this.sequelize.sync();
+            await this.sequelize.sync({ alter: true });
             console.log('Modelos sincronizados correctamente.');
         } catch (error) {
             console.error('Error al sincronizar modelos:', error);

@@ -18,6 +18,7 @@ module.exports = (req, res, next) => {
           { 
             id: decoded.id,
             username: decoded.username,
+            role: decoded.role,
             timestamp: new Date().toISOString()
           }, 
           process.env.JWT_SECRET, 

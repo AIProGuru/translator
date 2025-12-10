@@ -105,7 +105,7 @@ export default function PromptTemplateAdminPage() {
   };
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute roles={["administrator"]}>
       <Navbar />
       <main className="container mx-auto px-4 py-10 space-y-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">

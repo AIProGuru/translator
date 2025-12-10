@@ -13,6 +13,7 @@ const AuthContext = createContext({
   user: null,
   token: null,
   login: async () => {},
+  changePassword: async () => {},
   logout: async () => {},
   isLoading: true,
 });
@@ -116,15 +117,20 @@ export function AuthProvider({ children }) {
     };
   }, [token, setServerError]);
 
-  const login = async () => {
+  const login = async ({ username, password }) => {
     try {
-      const res = await fetch(`${BACK_HOST}/api/auth/test-login`, {
+      const res = await fetch(`${BACK_HOST}/api/auth/login`, {
         method: "POST",
         credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
       });
 
       if (!res.ok) {
-        throw new Error("Test login failed");
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.message || "Unable to login");
       }
 
       const data = await res.json();
@@ -133,26 +139,42 @@ export function AuthProvider({ children }) {
       persistUser(data.user);
       persistToken(data.token);
       setServerError(false);
+      return data;
     } catch (error) {
-      console.error("Error during test login:", error);
       setUser(null);
       setToken(null);
       persistUser(null);
       persistToken(null);
-      setServerError(true);
+      throw error;
     }
+  };
+
+  const changePassword = async ({ currentPassword, newPassword }) => {
+    const res = await fetch(`${BACK_HOST}/api/auth/change-password`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      throw new Error(payload.message || "Unable to change password");
+    }
+
+    const data = await res.json();
+    setUser(data.user);
+    setToken(data.token);
+    persistUser(data.user);
+    persistToken(data.token);
+    return data.user;
   };
 
   const logout = async () => {
     try {
-      const res = await fetch(`${BACK_HOST}/api/auth/ping`, {
-        method: "GET",
-      });
-
-      if (!res.ok) {
-        throw new Error("Servidor no responde");
-      }
-
       await fetch(`${BACK_HOST}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
@@ -174,6 +196,7 @@ export function AuthProvider({ children }) {
       user,
       token,
       login,
+      changePassword,
       logout,
       isLoading,
     }),
@@ -190,6 +213,7 @@ export const useAuth = () =>
     user: null,
     token: null,
     login: async () => {},
+    changePassword: async () => {},
     logout: async () => {},
     isLoading: true,
   };

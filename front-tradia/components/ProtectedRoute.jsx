@@ -1,24 +1,39 @@
 "use client";
 
-import { useAuth } from "../context/AuthContext"; // Ajusta la ruta según dónde esté tu AuthContext
+import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-export default function ProtectedRoute({ children }) {
+export default function ProtectedRoute({ children, roles }) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      // Redirige al login si no hay usuario autenticado
+    if (isLoading) return;
+    if (!user) {
       router.push("/");
+      return;
     }
-  }, [user, isLoading, router]);
+    if (Array.isArray(roles) && roles.length > 0 && !roles.includes(user.role)) {
+      router.push("/dashboard");
+    }
+  }, [user, isLoading, roles, router]);
 
   if (isLoading) {
-    // Muestra un estado de carga mientras se verifica la autenticación
-    return <div>Cargando...</div>;
+    return <div className="py-10 text-center text-gray-500">Verifying access...</div>;
   }
 
-  return children; // Renderiza los componentes protegidos si está autenticado
+  if (!user) {
+    return <div className="py-10 text-center text-gray-500">Redirecting...</div>;
+  }
+
+  if (Array.isArray(roles) && roles.length > 0 && !roles.includes(user.role)) {
+    return (
+      <div className="py-10 text-center text-red-600">
+        You do not have permission to view this section.
+      </div>
+    );
+  }
+
+  return children;
 }

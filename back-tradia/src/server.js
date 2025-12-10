@@ -1,21 +1,23 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const passport = require("passport");
+require("./Api/shared/config/passport.config");
 const documentProcessing = require("./Api/routes/document_processing.routes");
 const processRoutes = require("./Api/routes/process.routes");
 const promptTemplateRoutes = require("./Api/routes/prompt_templates.routes");
-const requireAuth = require("./Facades/middleware/auth.middleware");
+const userRoutes = require("./Api/routes/user.routes");
+const requireAuth = require("./Facades/middleware/requireAuth");
 const authenticate = require("./Api/routes/auth.routes");
-const passport = require("passport");
 const constants = require("./Api/shared/config/constants");
 const cookieParser = require("cookie-parser");
 const processWatcher = require('./Facades/services/processWhatcher/processWatcher');
-
-require("./Api/shared/config/passport.config");
+const userService = require("./Facades/services/users");
 
 const DatabaseConnection = require("./Api/infrastructure/database/connections/sequelize.connection");
 const refreshToken = require("./Facades/middleware/refreshToken");
 
+app.set("trust proxy", 1);
 app.use(
     cors({
         origin: constants.FRONT_HOST,
@@ -24,13 +26,13 @@ app.use(
 );
 app.use(cookieParser());
 app.use(refreshToken);
+app.use(passport.initialize());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(passport.initialize());
-
 app.use("/api", documentProcessing);
 app.use("/api", processRoutes);
 app.use("/api", promptTemplateRoutes);
+app.use("/api", userRoutes);
 app.use("/api/auth", authenticate);
 
 app.get("/protected", requireAuth, (req, res) => {
@@ -41,6 +43,7 @@ const initializeDatabase = async () => {
     const db = DatabaseConnection.getInstance();
     await db.authenticate();
     await db.syncModels();
+    await userService.ensureAdminAccount();
 };
 
 app.use((req, res) => {

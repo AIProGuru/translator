@@ -1,5 +1,6 @@
 const express = require("express");
 const requireAuth = require("../../Facades/middleware/requireAuth");
+const requireRole = require("../../Facades/middleware/requireRole");
 const PromptTemplateService = require("../../Facades/services/promptTemplates");
 
 const router = express.Router();
@@ -33,7 +34,7 @@ router.get("/prompt-templates", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/prompt-templates", requireAuth, async (req, res) => {
+router.post("/prompt-templates", requireAuth, requireRole(["administrator"]), async (req, res) => {
   try {
     const template = await service.create(req.body);
     res.status(201).json(serializeTemplate(template));
@@ -43,7 +44,7 @@ router.post("/prompt-templates", requireAuth, async (req, res) => {
   }
 });
 
-router.put("/prompt-templates/:id", requireAuth, async (req, res) => {
+router.put("/prompt-templates/:id", requireAuth, requireRole(["administrator"]), async (req, res) => {
   try {
     const template = await service.update(req.params.id, req.body);
     res.json(serializeTemplate(template));
@@ -53,7 +54,7 @@ router.put("/prompt-templates/:id", requireAuth, async (req, res) => {
   }
 });
 
-router.delete("/prompt-templates/:id", requireAuth, async (req, res) => {
+router.delete("/prompt-templates/:id", requireAuth, requireRole(["administrator"]), async (req, res) => {
   try {
     await service.delete(req.params.id);
     res.status(204).end();
@@ -63,7 +64,7 @@ router.delete("/prompt-templates/:id", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/prompt-templates/reset", requireAuth, async (req, res) => {
+router.post("/prompt-templates/reset", requireAuth, requireRole(["administrator"]), async (req, res) => {
   try {
     const templates = await service.seedDefaults();
     res.json(templates.map(serializeTemplate));

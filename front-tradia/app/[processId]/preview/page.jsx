@@ -347,6 +347,7 @@ export default function PreviewPage({ params }) {
         const page = await translatedPdfDoc.getPage(pageIndex);
         const canvas = translatedCanvasRef.current;
         const context = canvas.getContext("2d");
+        if (!context) return;
 
         // Fit the translated page to the available width while preserving aspect ratio
         const initialViewport = page.getViewport({ scale: 1 });
@@ -355,14 +356,26 @@ export default function PreviewPage({ params }) {
           (container && container.clientWidth) || initialViewport.width;
         const scale = containerWidth / initialViewport.width;
         const viewport = page.getViewport({ scale });
+        const outputScale =
+          typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
 
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+        const renderWidth = Math.floor(viewport.width * outputScale);
+        const renderHeight = Math.floor(viewport.height * outputScale);
+        canvas.width = renderWidth;
+        canvas.height = renderHeight;
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, renderWidth, renderHeight);
 
         await page
           .render({
             canvasContext: context,
             viewport,
+            transform:
+              outputScale !== 1
+                ? [outputScale, 0, 0, outputScale, 0, 0]
+                : undefined,
           })
           .promise;
       } catch (error) {
@@ -381,21 +394,30 @@ export default function PreviewPage({ params }) {
       const scaleX = image.naturalWidth / image.width;
       const scaleY = image.naturalHeight / image.height;
 
+      const sourceWidth = Math.max(
+        1,
+        Math.round(completedCrop.width * scaleX),
+      );
+      const sourceHeight = Math.max(
+        1,
+        Math.round(completedCrop.height * scaleY),
+      );
+
       const canvas = document.createElement("canvas");
-      canvas.width = completedCrop.width;
-      canvas.height = completedCrop.height;
+      canvas.width = sourceWidth;
+      canvas.height = sourceHeight;
       const ctx = canvas.getContext("2d");
 
       ctx.drawImage(
         image,
         completedCrop.x * scaleX,
         completedCrop.y * scaleY,
-        completedCrop.width * scaleX,
-        completedCrop.height * scaleY,
+        sourceWidth,
+        sourceHeight,
         0,
         0,
-        completedCrop.width,
-        completedCrop.height,
+        sourceWidth,
+        sourceHeight,
       );
 
       // Optional simple background removal: make near-white pixels transparent
@@ -423,9 +445,11 @@ export default function PreviewPage({ params }) {
       const dataUrl = canvas.toDataURL("image/png");
       const newPatch = {
         id: `patch-${patches.length + 1}`,
-        page: 1,
-        width: canvas.width,
-        height: canvas.height,
+        page: currentPage,
+        width: completedCrop.width,
+        height: completedCrop.height,
+        bitmapWidth: canvas.width,
+        bitmapHeight: canvas.height,
         dataUrl,
         createdAt: Date.now(),
       };
@@ -441,6 +465,7 @@ export default function PreviewPage({ params }) {
   }, [
     cropImageUrl,
     completedCrop,
+    currentPage,
     patches.length,
     removePatchBackground,
     setIsCropMode,
@@ -1039,13 +1064,9 @@ export default function PreviewPage({ params }) {
           selectionStartRef.current = null;
           return;
         }
-        const dpr =
-          typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-        const scaledWidth = Math.max(1, Math.round(sw * dpr));
-        const scaledHeight = Math.max(1, Math.round(sh * dpr));
         const offscreen = document.createElement("canvas");
-        offscreen.width = scaledWidth;
-        offscreen.height = scaledHeight;
+        offscreen.width = Math.max(1, sw);
+        offscreen.height = Math.max(1, sh);
         const ctx = offscreen.getContext("2d");
         if (ctx) {
           ctx.imageSmoothingEnabled = false;
@@ -1057,8 +1078,8 @@ export default function PreviewPage({ params }) {
             sh,
             0,
             0,
-            scaledWidth,
-            scaledHeight,
+            offscreen.width,
+            offscreen.height,
           );
         }
         const dataUrl = offscreen.toDataURL("image/png");
@@ -2160,8 +2181,10 @@ export default function PreviewPage({ params }) {
                             <img
                               src={element.dataUrl}
                               alt={`Placed ${element.id}`}
-                              className="w-full h-full object-contain border border-red-500"
+                              className="w-full h-full object-contain"
                               style={{
+                                outline: "1px solid rgba(239,68,68,0.8)",
+                                outlineOffset: 0,
                                 boxShadow:
                                   element.id === activePatchId
                                     ? "0 0 0 2px rgba(59,130,246,0.8)"
