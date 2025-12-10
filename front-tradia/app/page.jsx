@@ -30,10 +30,10 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (!isLoading && user) {
+    if (!isLoading && user && !pendingReset) {
       router.push("/dashboard");
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, pendingReset, router]);
 
   useEffect(() => {
     if (!searchParams) return;
