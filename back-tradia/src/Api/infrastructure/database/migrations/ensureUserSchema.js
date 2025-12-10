@@ -51,7 +51,11 @@ module.exports = async function ensureUserSchema(sequelize) {
   try {
     tableDescription = await queryInterface.describeTable("user");
   } catch (error) {
-    if (error?.original?.code === "SQLITE_ERROR") {
+    if (
+      error?.message?.includes('No description found for "user"') ||
+      error?.original?.code === "SQLITE_ERROR"
+    ) {
+      await User.sync();
       return;
     }
     throw error;
