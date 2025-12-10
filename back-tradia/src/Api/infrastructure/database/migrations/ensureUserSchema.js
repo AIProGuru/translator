@@ -1,5 +1,5 @@
 const { QueryTypes } = require("sequelize");
-const User = require("../../infrastructure/database/models/user.model");
+const User = require("../models/user.model");
 
 function slugify(value = "") {
   return value
