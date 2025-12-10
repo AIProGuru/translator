@@ -34,9 +34,17 @@ class DatabaseConnection {
     }
 
     async syncModels() {
+        const shouldAutoAlter =
+            (process.env.DB_AUTO_MIGRATE || "").toLowerCase() === "true";
+
         try {
-            await this.sequelize.sync({ alter: true });
-            console.log('Modelos sincronizados correctamente.');
+            if (shouldAutoAlter) {
+                await this.sequelize.sync({ alter: true });
+                console.log('Modelos sincronizados con alter (DB_AUTO_MIGRATE=true).');
+            } else {
+                await this.sequelize.sync();
+                console.log('Modelos verificados (sin alter).');
+            }
         } catch (error) {
             console.error('Error al sincronizar modelos:', error);
             throw error;
