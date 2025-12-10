@@ -1,5 +1,4 @@
-const { QueryTypes } = require("sequelize");
-const User = require("../models/user.model");
+const { QueryTypes, DataTypes } = require("sequelize");
 
 function slugify(value = "") {
   return value
@@ -55,7 +54,6 @@ module.exports = async function ensureUserSchema(sequelize) {
       error?.message?.includes('No description found for "user"') ||
       error?.original?.code === "SQLITE_ERROR"
     ) {
-      await User.sync();
       return;
     }
     throw error;
@@ -71,7 +69,85 @@ module.exports = async function ensureUserSchema(sequelize) {
   );
 
   await queryInterface.renameTable("user", backupTable);
-  await User.sync({ force: true });
+  await queryInterface.createTable("user", {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+      allowNull: false,
+    },
+    username: {
+      type: DataTypes.STRING(80),
+      allowNull: false,
+      unique: true,
+    },
+    password_hash: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    full_name: {
+      type: DataTypes.STRING(150),
+      allowNull: false,
+    },
+    email: {
+      type: DataTypes.STRING(150),
+      allowNull: true,
+    },
+    role: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: "translator",
+    },
+    status: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: "active",
+    },
+    must_reset_password: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+    password_expires_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    last_login_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    last_login_ip: {
+      type: DataTypes.STRING(64),
+      allowNull: true,
+    },
+    failed_attempts: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    locked_until: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    googleId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    displayName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    createdAt: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+    updatedAt: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+  });
 
   const legacyRows = await sequelize.query(`SELECT * FROM \`${backupTable}\``, {
     type: QueryTypes.SELECT,
@@ -80,6 +156,7 @@ module.exports = async function ensureUserSchema(sequelize) {
   if (legacyRows.length) {
     const seen = new Set();
     const rows = legacyRows.map((row) => ({
+      id: row.id,
       username: generateUsername(row, seen),
       password_hash: row.password_hash,
       full_name:
@@ -102,7 +179,7 @@ module.exports = async function ensureUserSchema(sequelize) {
       updatedAt: row.updatedAt || new Date(),
     }));
 
-    await User.bulkCreate(rows, { validate: false });
+    await queryInterface.bulkInsert("user", rows);
   }
 
   await queryInterface.dropTable(backupTable);
