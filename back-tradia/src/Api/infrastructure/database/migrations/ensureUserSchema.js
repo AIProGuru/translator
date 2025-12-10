@@ -1,0 +1,106 @@
+const { QueryTypes } = require("sequelize");
+const User = require("../../infrastructure/database/models/user.model");
+
+function slugify(value = "") {
+  return value
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function generateUsername(row, existing) {
+  const candidates = [];
+  if (row.username) {
+    candidates.push(slugify(row.username));
+  }
+  if (row.email) {
+    candidates.push(slugify(row.email.split("@")[0]));
+  }
+  if (row.full_name) {
+    candidates.push(slugify(row.full_name.replace(/\s+/g, "-")));
+  }
+  if (row.displayName) {
+    candidates.push(slugify(row.displayName.replace(/\s+/g, "-")));
+  }
+  candidates.push(`user-${row.id || Date.now()}`);
+
+  for (const candidate of candidates) {
+    const base = candidate || "user";
+    let username = base;
+    let suffix = 1;
+    while (existing.has(username) || !username) {
+      username = `${base}${suffix}`;
+      suffix += 1;
+    }
+    if (!existing.has(username)) {
+      existing.add(username);
+      return username;
+    }
+  }
+  const fallback = `user-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  existing.add(fallback);
+  return fallback;
+}
+
+module.exports = async function ensureUserSchema(sequelize) {
+  const queryInterface = sequelize.getQueryInterface();
+
+  let tableDescription;
+  try {
+    tableDescription = await queryInterface.describeTable("user");
+  } catch (error) {
+    if (error?.original?.code === "SQLITE_ERROR") {
+      return;
+    }
+    throw error;
+  }
+
+  if (tableDescription.username) {
+    return;
+  }
+
+  const backupTable = `user_backup_${Date.now()}`;
+  console.warn(
+    `[DB] legacy 'user' table detected (missing username). Rebuilding automatically as ${backupTable}...`,
+  );
+
+  await queryInterface.renameTable("user", backupTable);
+  await User.sync({ force: true });
+
+  const legacyRows = await sequelize.query(`SELECT * FROM \`${backupTable}\``, {
+    type: QueryTypes.SELECT,
+  });
+
+  if (legacyRows.length) {
+    const seen = new Set();
+    const rows = legacyRows.map((row) => ({
+      username: generateUsername(row, seen),
+      password_hash: row.password_hash,
+      full_name:
+        row.full_name || row.displayName || row.email || "Unnamed User",
+      email: row.email || null,
+      role: row.role || "translator",
+      status: row.status || "active",
+      must_reset_password:
+        row.must_reset_password === undefined
+          ? true
+          : Boolean(row.must_reset_password),
+      password_expires_at: row.password_expires_at || null,
+      last_login_at: row.last_login_at || null,
+      last_login_ip: row.last_login_ip || null,
+      failed_attempts: row.failed_attempts || 0,
+      locked_until: row.locked_until || null,
+      googleId: row.googleId || null,
+      displayName: row.displayName || null,
+      createdAt: row.createdAt || new Date(),
+      updatedAt: row.updatedAt || new Date(),
+    }));
+
+    await User.bulkCreate(rows, { validate: false });
+  }
+
+  await queryInterface.dropTable(backupTable);
+  console.log("[DB] user table upgraded with username column.");
+};

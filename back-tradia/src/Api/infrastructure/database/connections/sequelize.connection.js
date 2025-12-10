@@ -1,5 +1,6 @@
 const { Sequelize } = require('sequelize');
 const config = require('../../../shared/config/database.config');
+const ensureUserSchema = require('../migrations/ensureUserSchema');
 
 class DatabaseConnection {
     static instance = null;
@@ -38,6 +39,7 @@ class DatabaseConnection {
             (process.env.DB_AUTO_MIGRATE || "").toLowerCase() === "true";
 
         try {
+            await ensureUserSchema(this.sequelize);
             if (shouldAutoAlter) {
                 await this.sequelize.sync({ alter: true });
                 console.log('Modelos sincronizados con alter (DB_AUTO_MIGRATE=true).');
