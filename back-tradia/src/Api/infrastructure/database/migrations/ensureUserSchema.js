@@ -1,4 +1,6 @@
 const { QueryTypes, DataTypes } = require("sequelize");
+const argon2 = require("argon2");
+const crypto = require("crypto");
 
 function slugify(value = "") {
   return value
@@ -155,29 +157,41 @@ module.exports = async function ensureUserSchema(sequelize) {
 
   if (legacyRows.length) {
     const seen = new Set();
-    const rows = legacyRows.map((row) => ({
-      id: row.id,
-      username: generateUsername(row, seen),
-      password_hash: row.password_hash,
-      full_name:
-        row.full_name || row.displayName || row.email || "Unnamed User",
-      email: row.email || null,
-      role: row.role || "translator",
-      status: row.status || "active",
-      must_reset_password:
-        row.must_reset_password === undefined
-          ? true
-          : Boolean(row.must_reset_password),
-      password_expires_at: row.password_expires_at || null,
-      last_login_at: row.last_login_at || null,
-      last_login_ip: row.last_login_ip || null,
-      failed_attempts: row.failed_attempts || 0,
-      locked_until: row.locked_until || null,
-      googleId: row.googleId || null,
-      displayName: row.displayName || null,
-      createdAt: row.createdAt || new Date(),
-      updatedAt: row.updatedAt || new Date(),
-    }));
+    const rows = [];
+    for (const row of legacyRows) {
+      let passwordHash = row.password_hash;
+      if (!passwordHash) {
+        const randomPassword =
+          crypto.randomUUID().replace(/-/g, "").slice(0, 16) + "Aa!";
+        passwordHash = await argon2.hash(randomPassword, {
+          type: argon2.argon2id,
+        });
+      }
+
+      rows.push({
+        id: row.id,
+        username: generateUsername(row, seen),
+        password_hash: passwordHash,
+        full_name:
+          row.full_name || row.displayName || row.email || "Unnamed User",
+        email: row.email || null,
+        role: row.role || "translator",
+        status: row.status || "active",
+        must_reset_password:
+          row.must_reset_password === undefined
+            ? true
+            : Boolean(row.must_reset_password),
+        password_expires_at: row.password_expires_at || null,
+        last_login_at: row.last_login_at || null,
+        last_login_ip: row.last_login_ip || null,
+        failed_attempts: row.failed_attempts || 0,
+        locked_until: row.locked_until || null,
+        googleId: row.googleId || null,
+        displayName: row.displayName || null,
+        createdAt: row.createdAt || new Date(),
+        updatedAt: row.updatedAt || new Date(),
+      });
+    }
 
     await queryInterface.bulkInsert("user", rows);
   }
