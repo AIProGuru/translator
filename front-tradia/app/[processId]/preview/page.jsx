@@ -15,6 +15,7 @@ import {
   Droplet,
   SquareDashedMousePointer as SelectionIcon,
   Type as TypeIcon,
+  Table as TableIcon,
   Undo2,
   Redo2,
   X as CloseIcon,
@@ -145,8 +146,10 @@ export default function PreviewPage({ params }) {
   const [patches, setPatches] = useState([]);
   const [placedPatches, setPlacedPatches] = useState([]); // { id, page, x, y, relWidth, relHeight, scaleX?, scaleY?, dataUrl, createdAt }
   const [textBoxes, setTextBoxes] = useState([]); // { id, page, x, y, relWidth, relHeight, text, fontSize, color, align, createdAt }
+  const [tables, setTables] = useState([]); // { id, page, x, y, relWidth, relHeight, rows, columns, borderColor, borderWidth, createdAt }
   const [activePatchId, setActivePatchId] = useState(null);
   const [activeTextBoxId, setActiveTextBoxId] = useState(null);
+  const [activeTableId, setActiveTableId] = useState(null);
   const [hoverElement, setHoverElement] = useState(null); // { type, id }
   const [hoverHandle, setHoverHandle] = useState(null);
   const dragStateRef = useRef(null); // { type, id, startClientX, startClientY, origX, origY, overlayRect }
@@ -171,7 +174,13 @@ export default function PreviewPage({ params }) {
   const [translatedNumPages, setTranslatedNumPages] = useState(1);
   const [history, setHistory] = useState(() => ({
     stack: [
-      { label: "initial", placedPatches: [], textBoxes: [], eraseRegions: [] },
+      {
+        label: "initial",
+        placedPatches: [],
+        textBoxes: [],
+        tables: [],
+        eraseRegions: [],
+      },
     ],
     pointer: 0,
   }));
@@ -202,6 +211,7 @@ export default function PreviewPage({ params }) {
       label,
       placedPatches: cloneDeep(placedPatches),
       textBoxes: cloneDeep(textBoxes),
+      tables: cloneDeep(tables),
       eraseRegions: cloneDeep(eraseRegions),
     };
     setHistory((prev) => {
@@ -218,7 +228,7 @@ export default function PreviewPage({ params }) {
         pointer: stack.length - 1,
       };
     });
-  }, [placedPatches, textBoxes, eraseRegions, historyTick]);
+  }, [placedPatches, textBoxes, tables, eraseRegions, historyTick]);
 
   const confirmRemoval = useCallback((message, action) => {
     if (typeof window === "undefined") {
@@ -252,6 +262,16 @@ export default function PreviewPage({ params }) {
     [setTextBoxes, setActiveTextBoxId, setMessage, requestHistorySnapshot],
   );
 
+  const handleRemoveTable = useCallback(
+    (id) => {
+      setTables((prev) => prev.filter((table) => table.id !== id));
+      setActiveTableId((current) => (current === id ? null : current));
+      setMessage("Table removed.");
+      requestHistorySnapshot("table-delete");
+    },
+    [setTables, setActiveTableId, setMessage, requestHistorySnapshot],
+  );
+
   const canUndo = history.pointer > 0;
   const canRedo = history.pointer < history.stack.length - 1;
   const handleUndo = useCallback(() => {
@@ -261,9 +281,11 @@ export default function PreviewPage({ params }) {
       isRestoringRef.current = true;
       setPlacedPatches(cloneDeep(target.placedPatches));
       setTextBoxes(cloneDeep(target.textBoxes));
+      setTables(cloneDeep(target.tables || []));
       setEraseRegions(cloneDeep(target.eraseRegions));
       setActivePatchId(null);
       setActiveTextBoxId(null);
+      setActiveTableId(null);
       setTimeout(() => {
         isRestoringRef.current = false;
       }, 0);
@@ -272,9 +294,11 @@ export default function PreviewPage({ params }) {
   }, [
     setPlacedPatches,
     setTextBoxes,
+    setTables,
     setEraseRegions,
     setActivePatchId,
     setActiveTextBoxId,
+    setActiveTableId,
   ]);
   const handleRedo = useCallback(() => {
     setHistory((prev) => {
@@ -283,9 +307,11 @@ export default function PreviewPage({ params }) {
       isRestoringRef.current = true;
       setPlacedPatches(cloneDeep(target.placedPatches));
       setTextBoxes(cloneDeep(target.textBoxes));
+      setTables(cloneDeep(target.tables || []));
       setEraseRegions(cloneDeep(target.eraseRegions));
       setActivePatchId(null);
       setActiveTextBoxId(null);
+      setActiveTableId(null);
       setTimeout(() => {
         isRestoringRef.current = false;
       }, 0);
@@ -294,9 +320,11 @@ export default function PreviewPage({ params }) {
   }, [
     setPlacedPatches,
     setTextBoxes,
+    setTables,
     setEraseRegions,
     setActivePatchId,
     setActiveTextBoxId,
+    setActiveTableId,
   ]);
   useEffect(() => {
     // Auto-load current page image for cropping on mount or when page changes
@@ -562,6 +590,7 @@ export default function PreviewPage({ params }) {
     setPlacedPatches((prev) => [...prev, placed]);
     setActivePatchId(placedId);
     setActiveTextBoxId(null);
+    setActiveTableId(null);
     setMessage("Patch dropped on translated PDF.");
   };
 
@@ -573,7 +602,8 @@ export default function PreviewPage({ params }) {
     const overlayEl = translatedOverlayRef.current;
     if (!overlayEl) return;
     const overlayRect = overlayEl.getBoundingClientRect();
-    const collection = type === "patch" ? placedPatches : textBoxes;
+    const collection =
+      type === "patch" ? placedPatches : type === "text" ? textBoxes : tables;
     const element = collection.find((entry) => entry.id === elementId);
     if (!element) return;
 
@@ -635,9 +665,15 @@ export default function PreviewPage({ params }) {
     if (type === "patch") {
       setActivePatchId(elementId);
       setActiveTextBoxId(null);
-    } else {
+      setActiveTableId(null);
+    } else if (type === "text") {
       setActiveTextBoxId(elementId);
       setActivePatchId(null);
+      setActiveTableId(null);
+    } else {
+      setActiveTableId(elementId);
+      setActivePatchId(null);
+      setActiveTextBoxId(null);
     }
   };
 
@@ -929,7 +965,11 @@ export default function PreviewPage({ params }) {
       const relDx = dx / overlayRect.width;
       const relDy = dy / overlayRect.height;
       const setter =
-        type === "patch" ? setPlacedPatches : setTextBoxes;
+        type === "patch"
+          ? setPlacedPatches
+          : type === "text"
+            ? setTextBoxes
+            : setTables;
 
       setter((prev) =>
         prev.map((item) =>
@@ -987,7 +1027,11 @@ export default function PreviewPage({ params }) {
       const newCenterY = (newTop + newBottom) / 2;
 
       const setter =
-        type === "patch" ? setPlacedPatches : setTextBoxes;
+        type === "patch"
+          ? setPlacedPatches
+          : type === "text"
+            ? setTextBoxes
+            : setTables;
       setter((prev) =>
         prev.map((item) =>
           item.id === id
@@ -1035,8 +1079,14 @@ export default function PreviewPage({ params }) {
     if (wasSelectionDrag && selectionRect) {
       setMessage("Selection adjusted. Choose an action or convert it.");
     }
-    if (completedDrag?.type === "text" && !wasSelectionDrag) {
-      requestHistorySnapshot("text-transform");
+    if (completedDrag && !wasSelectionDrag) {
+      if (completedDrag.type === "text") {
+        requestHistorySnapshot("text-transform");
+      } else if (completedDrag.type === "patch") {
+        requestHistorySnapshot("patch-transform");
+      } else if (completedDrag.type === "table") {
+        requestHistorySnapshot("table-transform");
+      }
     }
   };
 
@@ -1101,6 +1151,7 @@ export default function PreviewPage({ params }) {
         setPlacedPatches((prev) => [...prev, newPatch]);
         setActivePatchId(newPatch.id);
         setActiveTextBoxId(null);
+        setActiveTableId(null);
         if (eraseOriginal) {
           const eraseId = `erase-selection-${timestamp}-${Math.random()
             .toString(36)
@@ -1221,15 +1272,22 @@ export default function PreviewPage({ params }) {
         handleRemoveTextBox(activeTextBoxId);
       });
     }
+    if (activeTableId) {
+      return confirmRemoval("Delete the selected table?", () => {
+        handleRemoveTable(activeTableId);
+      });
+    }
     return false;
   }, [
     selectionRect,
     activePatchId,
     activeTextBoxId,
+    activeTableId,
     confirmRemoval,
     handleDeleteSelection,
     handleRemovePatch,
     handleRemoveTextBox,
+    handleRemoveTable,
   ]);
 
   useEffect(() => {
@@ -1370,6 +1428,7 @@ export default function PreviewPage({ params }) {
     setTextBoxes((prev) => [...prev, newBox]);
     setActiveTextBoxId(newBox.id);
     setActivePatchId(null);
+    setActiveTableId(null);
     setMessage("Text box added. Drag or resize it on the translated page.");
     requestHistorySnapshot("text-add");
   }, [
@@ -1377,6 +1436,7 @@ export default function PreviewPage({ params }) {
     setTextBoxes,
     setActiveTextBoxId,
     setActivePatchId,
+    setActiveTableId,
     setMessage,
     requestHistorySnapshot,
   ]);
@@ -1393,6 +1453,51 @@ export default function PreviewPage({ params }) {
     );
     requestHistorySnapshot("text-edit");
   }, [setTextBoxes, requestHistorySnapshot]);
+
+  const handleAddTable = useCallback(() => {
+    const timestamp = Date.now();
+    const newTable = {
+      id: `table-${timestamp}-${Math.random().toString(36).slice(2, 6)}`,
+      page: translatedPage,
+      x: 0.5,
+      y: 0.5,
+      relWidth: 0.4,
+      relHeight: 0.25,
+      rows: 3,
+      columns: 3,
+      borderColor: "#111111",
+      borderWidth: 1,
+      fillColor: "#FFFFFF",
+      createdAt: timestamp,
+    };
+    setTables((prev) => [...prev, newTable]);
+    setActiveTableId(newTable.id);
+    setActivePatchId(null);
+    setActiveTextBoxId(null);
+    setMessage("Table added. Drag or resize it on the translated page.");
+    requestHistorySnapshot("table-add");
+  }, [
+    translatedPage,
+    setTables,
+    setActiveTableId,
+    setActivePatchId,
+    setActiveTextBoxId,
+    setMessage,
+    requestHistorySnapshot,
+  ]);
+
+  const updateTable = useCallback((id, updater) => {
+    setTables((prev) =>
+      prev.map((table) =>
+        table.id === id
+          ? typeof updater === "function"
+            ? updater(table)
+            : { ...table, ...updater }
+          : table,
+      ),
+    );
+    requestHistorySnapshot("table-edit");
+  }, [setTables, requestHistorySnapshot]);
 
   const handleDownloadMerged = async () => {
     try {
@@ -1414,6 +1519,7 @@ export default function PreviewPage({ params }) {
       const ops = [
         ...placedPatches.map((p) => ({ type: "patch", item: p })),
         ...textBoxes.map((t) => ({ type: "text", item: t })),
+        ...tables.map((tbl) => ({ type: "table", item: tbl })),
         ...eraseRegions.map((r) => ({ type: "erase", item: r })),
       ].sort(
         (a, b) => (a.item.createdAt || 0) - (b.item.createdAt || 0),
@@ -1500,6 +1606,63 @@ export default function PreviewPage({ params }) {
               lineHeight: fontSize * 1.2,
             });
             currentY -= fontSize * 1.2;
+          }
+        } else if (op.type === "table") {
+          const table = op.item;
+          const pageIndex = (table.page || 1) - 1;
+          const page = pages[pageIndex];
+          if (!page) continue;
+
+          const pageWidth = page.getWidth();
+          const pageHeight = page.getHeight();
+          const width = table.relWidth * pageWidth;
+          const height = table.relHeight * pageHeight;
+          const centerX = table.x * pageWidth;
+          const centerYFromTop = table.y * pageHeight;
+          const x = centerX - width / 2;
+          const y = pageHeight - centerYFromTop - height / 2;
+          const rows = Math.max(1, table.rows || 1);
+          const columns = Math.max(1, table.columns || 1);
+          const borderWidth = table.borderWidth || 1;
+          const borderColor = hexToRgb(table.borderColor || "#111111", {
+            r: 0,
+            g: 0,
+            b: 0,
+          });
+          const fillColor = table.fillColor
+            ? hexToRgb(table.fillColor, { r: 1, g: 1, b: 1 })
+            : null;
+
+          page.drawRectangle({
+            x,
+            y,
+            width,
+            height,
+            borderWidth,
+            borderColor: rgb(borderColor.r, borderColor.g, borderColor.b),
+            color: fillColor ? rgb(fillColor.r, fillColor.g, fillColor.b) : undefined,
+          });
+
+          const rowHeight = height / rows;
+          for (let i = 1; i < rows; i += 1) {
+            const yPos = y + rowHeight * i;
+            page.drawLine({
+              start: { x, y: yPos },
+              end: { x: x + width, y: yPos },
+              thickness: borderWidth,
+              color: rgb(borderColor.r, borderColor.g, borderColor.b),
+            });
+          }
+
+          const columnWidth = width / columns;
+          for (let i = 1; i < columns; i += 1) {
+            const xPos = x + columnWidth * i;
+            page.drawLine({
+              start: { x: xPos, y },
+              end: { x: xPos, y: y + height },
+              thickness: borderWidth,
+              color: rgb(borderColor.r, borderColor.g, borderColor.b),
+            });
           }
         } else if (op.type === "erase") {
           const region = op.item;
@@ -1687,6 +1850,17 @@ export default function PreviewPage({ params }) {
                       handleAddTextBox();
                     }}
                   />
+                  <IconButton
+                    icon={TableIcon}
+                    label="Insert table"
+                    onClick={() => {
+                      setIsCropMode(false);
+                      setIsSelectionMode(false);
+                      setIsErasing(false);
+                      setIsColorPickMode(false);
+                      handleAddTable();
+                    }}
+                  />
                 </div>
               </div>
 
@@ -1866,6 +2040,132 @@ export default function PreviewPage({ params }) {
                   </div>
                 )}
               </div>
+
+              <div className="border rounded-lg bg-white shadow-sm p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-semibold text-gray-700">Tables</div>
+                  <span className="text-xs text-gray-400">{tables.length}</span>
+                </div>
+                {tables.length === 0 ? (
+                  <div className="text-xs text-gray-500">
+                    Use the table icon to add a grid overlay to the translated PDF.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {tables
+                      .slice()
+                      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+                      .map((table, idx) => (
+                        <div
+                          key={table.id}
+                          className="border border-gray-200 rounded p-2 bg-gray-50 text-xs text-gray-700 space-y-2"
+                        >
+                          <div className="flex items-center justify-between font-semibold">
+                            <span>Table #{idx + 1} (p{table.page})</span>
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                className="px-2 py-0.5 border rounded text-blue-600 border-blue-400"
+                                onClick={() => {
+                                  setTranslatedPage(table.page);
+                                  setActiveTableId(table.id);
+                                  setActivePatchId(null);
+                                  setActiveTextBoxId(null);
+                                }}
+                              >
+                                Select
+                              </button>
+                              <button
+                                type="button"
+                                className="px-2 py-0.5 border rounded text-red-600 border-red-300"
+                                onClick={() => handleRemoveTable(table.id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <label className="flex flex-col gap-1">
+                              <span>Page</span>
+                              <input
+                                type="number"
+                                min={1}
+                                className="border rounded px-1 py-0.5"
+                                value={table.page}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value || "1", 10);
+                                  updateTable(table.id, {
+                                    page: Number.isNaN(value) || value < 1 ? 1 : value,
+                                  });
+                                }}
+                              />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span>Rows</span>
+                              <input
+                                type="number"
+                                min={1}
+                                max={25}
+                                className="border rounded px-1 py-0.5"
+                                value={table.rows}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value || "1", 10);
+                                  updateTable(table.id, {
+                                    rows: Number.isNaN(value) || value < 1 ? 1 : Math.min(50, value),
+                                  });
+                                }}
+                              />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span>Columns</span>
+                              <input
+                                type="number"
+                                min={1}
+                                max={25}
+                                className="border rounded px-1 py-0.5"
+                                value={table.columns}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value || "1", 10);
+                                  updateTable(table.id, {
+                                    columns: Number.isNaN(value) || value < 1 ? 1 : Math.min(50, value),
+                                  });
+                                }}
+                              />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span>Border color</span>
+                              <input
+                                type="color"
+                                className="w-full h-7 border rounded"
+                                value={table.borderColor || "#111111"}
+                                onChange={(e) =>
+                                  updateTable(table.id, { borderColor: e.target.value })
+                                }
+                              />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span>Border width</span>
+                              <input
+                                type="number"
+                                min={0.25}
+                                max={8}
+                                step={0.25}
+                                className="border rounded px-1 py-0.5"
+                                value={table.borderWidth ?? 1}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value);
+                                  updateTable(table.id, {
+                                    borderWidth: Number.isNaN(value) ? 1 : Math.max(0.25, value),
+                                  });
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
             </aside>
             <div className="flex-1 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2011,6 +2311,9 @@ export default function PreviewPage({ params }) {
                       ...textBoxes
                         .filter((t) => t.page === translatedPage)
                         .map((t) => ({ type: "text", item: t })),
+                      ...tables
+                        .filter((tbl) => tbl.page === translatedPage)
+                        .map((tbl) => ({ type: "table", item: tbl })),
                       ...eraseRegions
                         .filter((r) => r.page === translatedPage)
                         .map((r) => ({ type: "erase", item: r })),
@@ -2139,6 +2442,96 @@ export default function PreviewPage({ params }) {
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleRemoveTextBox(element.id);
+                                  }}
+                                >
+                                  <CloseIcon className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        if (entry.type === "table") {
+                          const style = {
+                            left: `${element.x * 100}%`,
+                            top: `${element.y * 100}%`,
+                            width: `${element.relWidth * 100}%`,
+                            height: `${element.relHeight * 100}%`,
+                            transform: "translate(-50%, -50%)",
+                          };
+                          const rows = Math.max(1, element.rows || 1);
+                          const columns = Math.max(1, element.columns || 1);
+                          const borderHex = element.borderColor || "#111111";
+                          const backgroundImage = `
+                            linear-gradient(to right, ${borderHex} 0, ${borderHex} 1px, transparent 1px),
+                            linear-gradient(to bottom, ${borderHex} 0, ${borderHex} 1px, transparent 1px)
+                          `;
+                          const backgroundSize = `${100 / columns}% 100%, 100% ${100 / rows}%`;
+                          return (
+                            <div
+                              key={element.id}
+                              className="absolute"
+                              style={style}
+                              onMouseDown={(e) =>
+                                handleElementMouseDown("table", element.id, e)
+                              }
+                              onMouseMove={(e) =>
+                                handleElementHover("table", element.id, e)
+                              }
+                              onMouseLeave={() => {
+                                if (
+                                  hoverElement &&
+                                  hoverElement.type === "table" &&
+                                  hoverElement.id === element.id
+                                ) {
+                                  setHoverElement(null);
+                                  setHoverHandle(null);
+                                }
+                              }}
+                            >
+                              <div
+                                className="w-full h-full rounded-sm bg-white/80"
+                                style={{
+                                  border: `${element.borderWidth ?? 1}px solid ${borderHex}`,
+                                  backgroundImage,
+                                  backgroundSize,
+                                  backgroundPosition: "center",
+                                  boxShadow:
+                                    element.id === activeTableId
+                                      ? "0 0 0 2px rgba(59,130,246,0.5)"
+                                      : undefined,
+                                  cursor,
+                                }}
+                              />
+                              {["nw", "ne", "sw", "se"].map((pos) => (
+                                <div
+                                  key={pos}
+                                  className="absolute w-3 h-3 rounded-full bg-white border border-blue-500"
+                                  style={{
+                                    ...(pos === "nw"
+                                      ? { top: -6, left: -6 }
+                                      : pos === "ne"
+                                        ? { top: -6, right: -6 }
+                                        : pos === "sw"
+                                          ? { bottom: -6, left: -6 }
+                                          : { bottom: -6, right: -6 }),
+                                    cursor:
+                                      pos === "nw" || pos === "se"
+                                        ? "nwse-resize"
+                                        : "nesw-resize",
+                                  }}
+                                  onMouseDown={(e) =>
+                                    handleElementMouseDown("table", element.id, e, pos)
+                                  }
+                                />
+                              ))}
+                              {element.id === activeTableId && (
+                                <button
+                                  type="button"
+                                  className="absolute -top-3 -right-3 h-6 w-6 rounded-full bg-white border border-gray-300 shadow text-gray-500 hover:bg-red-50 hover:text-red-600"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveTable(element.id);
                                   }}
                                 >
                                   <CloseIcon className="h-3.5 w-3.5" />
