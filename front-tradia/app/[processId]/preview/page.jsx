@@ -1633,15 +1633,19 @@ export default function PreviewPage({ params }) {
             ? hexToRgb(table.fillColor, { r: 1, g: 1, b: 1 })
             : null;
 
-          page.drawRectangle({
+          const rectangleOptions = {
             x,
             y,
             width,
             height,
             borderWidth,
             borderColor: rgb(borderColor.r, borderColor.g, borderColor.b),
-            color: fillColor ? rgb(fillColor.r, fillColor.g, fillColor.b) : undefined,
-          });
+          };
+          if (fillColor) {
+            rectangleOptions.color = rgb(fillColor.r, fillColor.g, fillColor.b);
+          }
+
+          page.drawRectangle(rectangleOptions);
 
           const rowHeight = height / rows;
           for (let i = 1; i < rows; i += 1) {
