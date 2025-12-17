@@ -2490,9 +2490,10 @@ export default function PreviewPage({ params }) {
                               }}
                             >
                               <div
-                                className="w-full h-full rounded-sm bg-white/80"
+                                className="w-full h-full rounded-sm"
                                 style={{
                                   border: `${element.borderWidth ?? 1}px solid ${borderHex}`,
+                                  backgroundColor: "transparent",
                                   backgroundImage,
                                   backgroundSize,
                                   backgroundPosition: "center",
