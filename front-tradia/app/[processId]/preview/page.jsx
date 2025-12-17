@@ -1632,20 +1632,45 @@ export default function PreviewPage({ params }) {
           const fillColor = table.fillColor
             ? hexToRgb(table.fillColor, { r: 1, g: 1, b: 1 })
             : null;
+          const borderRgb = rgb(borderColor.r, borderColor.g, borderColor.b);
 
-          const rectangleOptions = {
-            x,
-            y,
-            width,
-            height,
-            borderWidth,
-            borderColor: rgb(borderColor.r, borderColor.g, borderColor.b),
-          };
           if (fillColor) {
-            rectangleOptions.color = rgb(fillColor.r, fillColor.g, fillColor.b);
+            page.drawRectangle({
+              x,
+              y,
+              width,
+              height,
+              borderWidth,
+              borderColor: borderRgb,
+              color: rgb(fillColor.r, fillColor.g, fillColor.b),
+            });
+          } else {
+            // Draw only the outline so the table stays transparent in the merged PDF
+            page.drawLine({
+              start: { x, y },
+              end: { x: x + width, y },
+              thickness: borderWidth,
+              color: borderRgb,
+            });
+            page.drawLine({
+              start: { x, y: y + height },
+              end: { x: x + width, y: y + height },
+              thickness: borderWidth,
+              color: borderRgb,
+            });
+            page.drawLine({
+              start: { x, y },
+              end: { x, y: y + height },
+              thickness: borderWidth,
+              color: borderRgb,
+            });
+            page.drawLine({
+              start: { x: x + width, y },
+              end: { x: x + width, y: y + height },
+              thickness: borderWidth,
+              color: borderRgb,
+            });
           }
-
-          page.drawRectangle(rectangleOptions);
 
           const rowHeight = height / rows;
           for (let i = 1; i < rows; i += 1) {
