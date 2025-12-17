@@ -1467,7 +1467,7 @@ export default function PreviewPage({ params }) {
       columns: 3,
       borderColor: "#111111",
       borderWidth: 1,
-      fillColor: "#FFFFFF",
+      fillColor: null,
       createdAt: timestamp,
     };
     setTables((prev) => [...prev, newTable]);
@@ -1629,8 +1629,12 @@ export default function PreviewPage({ params }) {
             g: 0,
             b: 0,
           });
-          const fillColor = table.fillColor
-            ? hexToRgb(table.fillColor, { r: 1, g: 1, b: 1 })
+          const fillColorHex =
+            table.fillColor && table.fillColor !== "#FFFFFF"
+              ? table.fillColor
+              : null;
+          const fillColor = fillColorHex
+            ? hexToRgb(fillColorHex, { r: 1, g: 1, b: 1 })
             : null;
           const borderRgb = rgb(borderColor.r, borderColor.g, borderColor.b);
 
