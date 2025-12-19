@@ -106,26 +106,6 @@ export default function ProcessPage({ params }) {
                   Processing Document
                 </h2>
                 <ProgressBar progress={progress} />
-
-                <div className="mt-8 max-h-64 overflow-y-auto bg-blue-50 rounded-lg p-4">
-                  {messages.length > 0 ? (
-                    messages.map((message, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5 }}
-                        className="mb-2 text-blue-800"
-                      >
-                        {message}
-                      </motion.div>
-                    ))
-                  ) : (
-                    <p className="text-blue-600">
-                      Init process of translate...
-                    </p>
-                  )}
-                </div>
               </div>
             ) : (
               <div className="text-center">
