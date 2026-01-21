@@ -148,7 +148,7 @@ export default function LoginPageClient() {
                 {error}
               </p>
             )}
-            <button
+            {/* <button
               type="button"
               onClick={handleGoogleLogin}
               className="w-full border border-gray-300 text-gray-700 font-semibold py-2.5 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2"
@@ -176,7 +176,7 @@ export default function LoginPageClient() {
                 />
               </svg>
               Continue with Google
-            </button>
+            </button> */}
             <button
               type="submit"
               disabled={isSubmitting}
