@@ -1,5 +1,5 @@
 const TranslationJobRepository = require("../../../Api/infrastructure/repositories/translation_job.repository");
-const constants = require("../../Api/shared/config/constants");
+const constants = require("../../../Api/shared/config/constants");
 
 class TranslationJobService {
 	constructor() {
