@@ -12,6 +12,8 @@ module.exports = {
 	BACK_HOST,
     FRONT_HOST,
 	URL_CONVERTER_API: `${BACK_HOST}/api/convert-pdf-to-image`,
+	METADATA_RETENTION_DAYS:
+		parseInt(process.env.METADATA_RETENTION_DAYS || "365", 10) || 365,
 	CONCURRENCY: 2,
 	LIMITS_PAGES: process.env.LIMITS_PAGES || 0,
 

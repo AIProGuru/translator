@@ -5,6 +5,7 @@ const passport = require("passport");
 require("./Api/shared/config/passport.config");
 const documentProcessing = require("./Api/routes/document_processing.routes");
 const processRoutes = require("./Api/routes/process.routes");
+const reportRoutes = require("./Api/routes/report.routes");
 const promptTemplateRoutes = require("./Api/routes/prompt_templates.routes");
 const userRoutes = require("./Api/routes/user.routes");
 const requireAuth = require("./Facades/middleware/requireAuth");
@@ -16,6 +17,7 @@ const userService = require("./Facades/services/users");
 
 const DatabaseConnection = require("./Api/infrastructure/database/connections/sequelize.connection");
 const refreshToken = require("./Facades/middleware/refreshToken");
+const TranslationJobService = require("./Facades/services/translationJobs");
 
 app.set("trust proxy", 1);
 app.use(
@@ -32,6 +34,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/auth", authenticate);
 app.use("/api", documentProcessing);
 app.use("/api", processRoutes);
+app.use("/api", reportRoutes);
 app.use("/api", promptTemplateRoutes);
 app.use("/api", userRoutes);
 
@@ -55,6 +58,14 @@ app.use((req, res) => {
 const startServer = async () => {
     try {
         await initializeDatabase();
+        const jobService = new TranslationJobService();
+        await jobService.purgeExpired();
+        const retentionIntervalMs = 24 * 60 * 60 * 1000;
+        setInterval(() => {
+            jobService.purgeExpired().catch((error) => {
+                console.error("Error al purgar metadata de traducciones:", error);
+            });
+        }, retentionIntervalMs);
         const server = app.listen(constants.PORT, () => {
             console.log(`Servidor corriendo en el puerto ${constants.PORT}`);
             console.log(`Directorio base para outputs: ${constants.BASE_PATH}`);

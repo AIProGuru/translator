@@ -1,4 +1,6 @@
 const ProcessRepository = require("../../../Api/infrastructure/repositories/process.repository");
+const TranslationJobService = require("../translationJobs");
+const constants = require("../../../Api/shared/config/constants");
 const { Op } = require('sequelize');
 
 class ProcessFacade {
@@ -7,6 +9,7 @@ class ProcessFacade {
 		this.processResources = new Map();
 		this.processingStates = new Map();
 		this.processRepository = new ProcessRepository();
+		this.translationJobService = new TranslationJobService();
 	}
 
 	async getAllProcesses(userId) {
@@ -64,6 +67,30 @@ class ProcessFacade {
 				message,
 				progress,
 			});
+		}
+
+		if (data.status) {
+			const status = data.status;
+			let metadataStatus = null;
+			if (status === constants.PROCESS_STATUS.ERROR) {
+				metadataStatus = "failed";
+			} else if (status === constants.PROCESS_STATUS.COMPLETED) {
+				metadataStatus = "completed";
+			} else if (status === constants.PROCESS_STATUS.TRANSLATING) {
+				metadataStatus = "translating";
+			} else if (status === constants.PROCESS_STATUS.PROCESSING) {
+				metadataStatus = "processing";
+			} else if (status === constants.PROCESS_STATUS.UPLOAD) {
+				metadataStatus = "processing";
+			} else if (status === constants.PROCESS_STATUS.PENDING) {
+				metadataStatus = "pending";
+			}
+
+			if (metadataStatus) {
+				await this.translationJobService.updateByProcessId(id, {
+					status: metadataStatus,
+				});
+			}
 		}
 
 		return updatedProcess;

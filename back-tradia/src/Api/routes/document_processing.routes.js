@@ -72,6 +72,10 @@ router.post("/process-document", requireAuth, async (req, res) => {
 			const adapter = req.body?.adapter || "openai";
 			const customPrompt = req.body?.prompt || "";
 			const language = req.body?.language || "spanish";
+			const sourceLanguage =
+				req.body?.sourceLanguage ||
+				req.body?.source_language ||
+				"auto";
 			const cycles = req.body?.cycles;
 			const documentTypeKey =
 				req.body?.documentTypeKey || req.body?.documentTypeId || "custom";
@@ -88,6 +92,7 @@ router.post("/process-document", requireAuth, async (req, res) => {
 				adapter,
 				prompt: customPrompt,
 				language,
+				sourceLanguage,
 				cycles,
 				documentType: dbTemplate
 					? {
@@ -129,6 +134,7 @@ router.post("/process-document", requireAuth, async (req, res) => {
 				req.file,
 				userId,
 				translationConfig,
+				{ pageCount: numPages },
 			);
 			req.process = process;
 
