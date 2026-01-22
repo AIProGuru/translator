@@ -71,11 +71,24 @@ class Export {
 						printBackground: true,
 						width: `${width}px`,
 						height: `${height}px`,
+						preferCSSPageSize: true,
+						margin: {
+							top: 0,
+							right: 0,
+							bottom: 0,
+							left: 0,
+						},
 				  }
 				: {
 						path: file_path,
 						printBackground: true,
 						format: "A4",
+						margin: {
+							top: 0,
+							right: 0,
+							bottom: 0,
+							left: 0,
+						},
 				  };
 
 		await page.pdf(pdfOptions);
@@ -127,7 +140,12 @@ class Export {
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<style>${headStyle || ""}</style>
+		<style>
+			html, body { margin: 0; padding: 0; }
+			@page { margin: 0; }
+			page { page-break-before: avoid !important; page-break-after: avoid !important; }
+			${headStyle || ""}
+		</style>
 	</head>
 	<body>
 		${pageHtml || ""}
@@ -177,6 +195,13 @@ class Export {
 				printBackground: true,
 				width: `${dimensions.width}px`,
 				height: `${dimensions.height}px`,
+				preferCSSPageSize: true,
+				margin: {
+					top: 0,
+					right: 0,
+					bottom: 0,
+					left: 0,
+				},
 			});
 			await page.close();
 
