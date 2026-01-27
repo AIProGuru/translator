@@ -15,6 +15,7 @@ import Navbar from "../../components/navbar";
 import ServerErrorModal from "@/components/ServerErrorModal";
 import { useSafeFetch } from "@/hooks/useSafeFetch";
 import ProtectedRoute from "../../components/ProtectedRoute";
+import QuoteModal from "@/components/QuoteModal";
 
 export default function Home() {
     const router = useRouter();
@@ -28,6 +29,10 @@ export default function Home() {
   const [customDocumentType, setCustomDocumentType] = useState("");
   const [processes, setProcesses] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [quoteData, setQuoteData] = useState(null);
+  const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [isAcceptingQuote, setIsAcceptingQuote] = useState(false);
+  const [isCancelingQuote, setIsCancelingQuote] = useState(false);
   const { user, isLoading } = useAuth();
   const { safeFetch, serverError, setServerError } = useSafeFetch();
   const { templates } = usePromptTemplates();
@@ -103,21 +108,81 @@ export default function Home() {
                 window.location.href = `${FRONT_HOST}/`;
                 return;
             }
-            const { processId, pages } = await response.json();
+            if (!response.ok) {
+                setServerError(true);
+                setIsUploading(false);
+                return;
+            }
 
-            const timePerPage = ESTIMATED_TIME_PER_PAGE[adapter] || 1.5;
-            const estimatedTime = timePerPage * (pages || 50);
-
-            localStorage.setItem(
-                `process_${processId}_estimated_time`,
-                estimatedTime
-            );
-            router.push(`/${processId}`);
+            const data = await response.json();
+            setQuoteData(data);
+            setShowQuoteModal(true);
+            setIsUploading(false);
         } catch (error) {
             console.error("Error uploading document:", error);
             setIsUploading(false);
         }
     };
+
+  const handleAcceptQuote = async () => {
+    if (!quoteData?.processId) return;
+    setIsAcceptingQuote(true);
+    try {
+      const response = await safeFetch(
+        `${BACK_HOST}/api/processes/${quoteData.processId}/accept`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      if (!response || !response.ok) {
+        setServerError(true);
+        return;
+      }
+      const timePerPage = ESTIMATED_TIME_PER_PAGE[adapter] || 1.5;
+      const estimatedTime = timePerPage * (quoteData.pages || 50);
+      localStorage.setItem(
+        `process_${quoteData.processId}_estimated_time`,
+        estimatedTime,
+      );
+      setShowQuoteModal(false);
+      router.push(`/${quoteData.processId}`);
+    } catch (error) {
+      console.error("Error accepting quote:", error);
+      setServerError(true);
+    } finally {
+      setIsAcceptingQuote(false);
+    }
+  };
+
+  const handleCancelQuote = async () => {
+    if (!quoteData?.processId) {
+      setShowQuoteModal(false);
+      return;
+    }
+    setIsCancelingQuote(true);
+    try {
+      const response = await safeFetch(
+        `${BACK_HOST}/api/processes/${quoteData.processId}/cancel`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      if (!response || !response.ok) {
+        setServerError(true);
+        return;
+      }
+      setShowQuoteModal(false);
+      setFile(null);
+      setQuoteData(null);
+    } catch (error) {
+      console.error("Error canceling quote:", error);
+      setServerError(true);
+    } finally {
+      setIsCancelingQuote(false);
+    }
+  };
 
     return (
         <>
@@ -253,6 +318,14 @@ export default function Home() {
                     {/* </motion.div> */}
                 </div>
             </main>
+            <QuoteModal
+              isOpen={showQuoteModal}
+              quote={quoteData}
+              onAccept={handleAcceptQuote}
+              onCancel={handleCancelQuote}
+              isAccepting={isAcceptingQuote}
+              isCancelling={isCancelingQuote}
+            />
         </ProtectedRoute>
         </>
     );

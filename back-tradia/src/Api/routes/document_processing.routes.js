@@ -12,7 +12,7 @@ const PromptTemplateService = require("../../Facades/services/promptTemplates");
 const PricingTierService = require("../../Facades/services/pricingTiers");
 
 const pdfParse = require("pdf-parse");
-const { LIMITS_PAGES } = require("../shared/config/constants");
+const { LIMITS_PAGES, PROCESS_STATUS } = require("../shared/config/constants");
 
 const router = express.Router();
 const facade = new DocumentProcessingFacade();
@@ -148,19 +148,35 @@ router.post("/process-document", requireAuth, async (req, res) => {
 			);
 			req.process = process;
 
+			const processDir = fileManagement.createProcessDirectory(process.id);
+			const originalExt = path.extname(req.file.originalname) || ".pdf";
+			const storedFilename = `original-${process.id}${originalExt}`;
+			const storedPath = path.join(processDir, storedFilename);
+
+			await fs.promises.rename(filePath, storedPath);
+
+			await processFacade.updateProcess(
+				process.id,
+				{
+					status: PROCESS_STATUS.AWAITING_ACCEPTANCE,
+					message: "Awaiting quote acceptance.",
+					config: {
+						...(process.config || {}),
+						uploadPath: storedPath,
+					},
+				},
+				userId,
+			);
+
 			res.status(200).json({
-				message: "Archivo subido. Iniciando proceso...",
+				message: "Archivo subido. Esperando aceptación.",
 				processId: process.id,
-				status: "recibido",
+				status: PROCESS_STATUS.AWAITING_ACCEPTANCE,
 				pages: numPages,
 				wordCount,
 				pricingTier: pricingQuote.tier,
 				estimatedCost: pricingQuote.totalCost,
 				currency: pricingQuote.currency,
-			});
-
-			setImmediate(() => {
-				facade.processDocument(req);
 			});
 		} catch (error) {
 			res.status(500).json({

@@ -18,15 +18,16 @@ const Process = sequelize.define(
                 len: [2, 100],
             },
         },
-        status: {
-            type: DataTypes.ENUM(
-                "pending",
-                "upload",
-                "processing",
-                "translating",
-                "completed",
-                "error",
-                "canceled"
+		status: {
+			type: DataTypes.ENUM(
+				"pending",
+				"upload",
+				"awaiting_acceptance",
+				"processing",
+				"translating",
+				"completed",
+				"error",
+				"canceled"
             ),
             allowNull: false,
             defaultValue: "pending",

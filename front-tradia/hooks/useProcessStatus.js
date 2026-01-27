@@ -46,6 +46,9 @@ export const useProcessStatus = (processId) => {
                             setProgress(Math.min(95, (messages.length + 1) * 5));
                         }
                         break;
+                    case "awaiting_acceptance":
+                        setStatus("awaiting_acceptance");
+                        break;
                     case "error":
                         setStatus("error");
                         eventSource.close();

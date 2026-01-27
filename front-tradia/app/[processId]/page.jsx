@@ -100,7 +100,16 @@ export default function ProcessPage({ params }) {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="max-w-3xl mx-auto bg-white rounded-xl shadow-xl p-8"
           >
-            {status === "pending" ? (
+            {status === "awaiting_acceptance" ? (
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-blue-800 mb-4">
+                  Awaiting Acceptance
+                </h2>
+                <p className="text-blue-600">
+                  Please accept the quote from the dashboard to start processing.
+                </p>
+              </div>
+            ) : status === "pending" ? (
               <div>
                 <h2 className="text-2xl font-bold text-blue-800 mb-6">
                   Processing Document

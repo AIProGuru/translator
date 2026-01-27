@@ -56,6 +56,7 @@ module.exports = {
 	PROCESS_STATUS: {
 		PENDING: "pending",
 		UPLOAD: "upload",
+		AWAITING_ACCEPTANCE: "awaiting_acceptance",
 		PROCESSING: "processing",
 		TRANSLATING: "translating",
 		COMPLETED: "completed",

@@ -82,6 +82,8 @@ class ProcessFacade {
 				metadataStatus = "processing";
 			} else if (status === constants.PROCESS_STATUS.UPLOAD) {
 				metadataStatus = "processing";
+			} else if (status === constants.PROCESS_STATUS.AWAITING_ACCEPTANCE) {
+				metadataStatus = "pending";
 			} else if (status === constants.PROCESS_STATUS.PENDING) {
 				metadataStatus = "pending";
 			}
