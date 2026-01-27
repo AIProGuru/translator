@@ -47,6 +47,8 @@ class ProcessManager {
 			documentType: normalizedDocumentType,
 		};
 
+		const pricingQuote = jobMeta.pricingQuote || null;
+
 		const process = await this._processFacade.createProcess({
 			userId:userId,
 			slug: `Proceso-de-${Date.now()}`,
@@ -57,6 +59,15 @@ class ProcessManager {
 				fileSize: file.size,
 				mimeType: file.mimetype,
 				pageCount: jobMeta.pageCount,
+				wordCount: jobMeta.wordCount,
+				pricingQuote: pricingQuote
+					? {
+							wordCount: pricingQuote.wordCount,
+							tier: pricingQuote.tier,
+							totalCost: pricingQuote.totalCost,
+							currency: pricingQuote.currency,
+					  }
+					: null,
 				translation: normalizedTranslationConfig,
 			},
 			message: "Queued for translation",

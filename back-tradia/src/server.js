@@ -8,6 +8,7 @@ const processRoutes = require("./Api/routes/process.routes");
 const reportRoutes = require("./Api/routes/report.routes");
 const promptTemplateRoutes = require("./Api/routes/prompt_templates.routes");
 const userRoutes = require("./Api/routes/user.routes");
+const pricingTierRoutes = require("./Api/routes/pricing_tiers.routes");
 const requireAuth = require("./Facades/middleware/requireAuth");
 const authenticate = require("./Api/routes/auth.routes");
 const constants = require("./Api/shared/config/constants");
@@ -37,6 +38,7 @@ app.use("/api", processRoutes);
 app.use("/api", reportRoutes);
 app.use("/api", promptTemplateRoutes);
 app.use("/api", userRoutes);
+app.use("/api", pricingTierRoutes);
 
 app.get("/protected", requireAuth, (req, res) => {
     res.json({ message: "Ruta protegida", user: req.user });

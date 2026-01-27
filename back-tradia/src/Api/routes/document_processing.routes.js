@@ -9,6 +9,7 @@ const ProcessFacade = require("../../Facades/services/process");
 const Export = require("../../Facades/services/exports/export");
 const requireAuth = require("../../Facades/middleware/requireAuth");
 const PromptTemplateService = require("../../Facades/services/promptTemplates");
+const PricingTierService = require("../../Facades/services/pricingTiers");
 
 const pdfParse = require("pdf-parse");
 const { LIMITS_PAGES } = require("../shared/config/constants");
@@ -16,6 +17,7 @@ const { LIMITS_PAGES } = require("../shared/config/constants");
 const router = express.Router();
 const facade = new DocumentProcessingFacade();
 const promptTemplateService = new PromptTemplateService();
+const pricingTierService = new PricingTierService();
 
 const processFacade = new ProcessFacade();
 const fileManagement = new FileManagementService();
@@ -50,6 +52,12 @@ function stripPlaceholderRegions(html) {
 	);
 
 	return cleaned;
+}
+
+function countWords(text) {
+	if (!text) return 0;
+	const matches = text.match(/[\p{L}\p{N}]+/gu);
+	return matches ? matches.length : 0;
 }
 
 router.post("/process-document", requireAuth, async (req, res) => {
@@ -122,6 +130,8 @@ router.post("/process-document", requireAuth, async (req, res) => {
 
 			const pdfInfo = await pdfParse(fileData);
 			const numPages = pdfInfo.numpages;
+			const wordCount = countWords(pdfInfo.text || "");
+			const pricingQuote = await pricingTierService.getQuote(wordCount);
 
 			if (numPages > LIMITS_PAGES && LIMITS_PAGES) {
 				fs.unlinkSync(filePath);
@@ -134,7 +144,7 @@ router.post("/process-document", requireAuth, async (req, res) => {
 				req.file,
 				userId,
 				translationConfig,
-				{ pageCount: numPages },
+				{ pageCount: numPages, wordCount, pricingQuote },
 			);
 			req.process = process;
 
@@ -143,6 +153,10 @@ router.post("/process-document", requireAuth, async (req, res) => {
 				processId: process.id,
 				status: "recibido",
 				pages: numPages,
+				wordCount,
+				pricingTier: pricingQuote.tier,
+				estimatedCost: pricingQuote.totalCost,
+				currency: pricingQuote.currency,
 			});
 
 			setImmediate(() => {
