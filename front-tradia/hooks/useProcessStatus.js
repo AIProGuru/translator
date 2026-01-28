@@ -49,6 +49,12 @@ export const useProcessStatus = (processId) => {
                     case "awaiting_acceptance":
                         setStatus("awaiting_acceptance");
                         break;
+                    case "payment_pending":
+                        setStatus("payment_pending");
+                        break;
+                    case "payment_confirmed":
+                        setStatus("payment_confirmed");
+                        break;
                     case "error":
                         setStatus("error");
                         eventSource.close();

@@ -23,6 +23,8 @@ const Process = sequelize.define(
 				"pending",
 				"upload",
 				"awaiting_acceptance",
+				"payment_pending",
+				"payment_confirmed",
 				"processing",
 				"translating",
 				"completed",

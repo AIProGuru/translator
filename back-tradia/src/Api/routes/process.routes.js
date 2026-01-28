@@ -2,7 +2,7 @@ const express = require("express");
 const ProcessFacade = require("../../Facades/services/process");
 const requireAuth = require("../../Facades/middleware/requireAuth");
 const DocumentProcessingFacade = require("../../Facades/services/documents");
-const { PROCESS_STATUS } = require("../shared/config/constants");
+const { PROCESS_STATUS, FRONT_HOST } = require("../shared/config/constants");
 const fs = require("fs");
 const path = require("path");
 
@@ -27,6 +27,19 @@ router.get(
 		}
 	}
 );
+
+router.get("/processes/:id", requireAuth, async (req, res) => {
+	try {
+		const userId = req.user.id;
+		const process = await processFacade.getProcessById(req.params.id, userId);
+		res.json(process);
+	} catch (error) {
+		res.status(404).json({
+			error: "Process not found",
+			details: error.message,
+		});
+	}
+});
 
 router.post("/processes", async (req, res) => {
 	try {
@@ -82,25 +95,29 @@ router.post("/processes/:id/accept", requireAuth, async (req, res) => {
 			size: config.fileSize || 0,
 		};
 
+		const pricingQuote = config.pricingQuote || {};
+		const payment = {
+			status: PROCESS_STATUS.PAYMENT_PENDING,
+			requiredAmount: pricingQuote.totalCost ?? null,
+			currency: pricingQuote.currency || "USD",
+			confirmedAt: null,
+		};
+
 		await processFacade.updateProcess(
 			processId,
 			{
-				status: PROCESS_STATUS.PENDING,
-				message: "Quote accepted. Starting translation.",
+				status: PROCESS_STATUS.PAYMENT_PENDING,
+				message: "Payment required to start translation.",
+				config: {
+					...config,
+					payment,
+				},
 			},
 			userId,
 		);
 
-		res.json({ message: "Quote accepted. Translation started." });
-
-		setImmediate(() => {
-			documentFacade.processDocument({
-				user: req.user,
-				process,
-				file,
-				body: config.translation || {},
-			});
-		});
+		const paymentUrl = `${FRONT_HOST}/${processId}/payment`;
+		res.json({ message: "Payment required.", paymentUrl });
 	} catch (error) {
 		res.status(500).json({
 			error: "Error accepting process.",
@@ -115,7 +132,11 @@ router.post("/processes/:id/cancel", requireAuth, async (req, res) => {
 		const processId = req.params.id;
 		const process = await processFacade.getProcessById(processId, userId);
 
-		if (process.status !== PROCESS_STATUS.AWAITING_ACCEPTANCE) {
+		if (
+			![PROCESS_STATUS.AWAITING_ACCEPTANCE, PROCESS_STATUS.PAYMENT_PENDING].includes(
+				process.status,
+			)
+		) {
 			return res.status(400).json({
 				error: "Process is not awaiting acceptance.",
 			});

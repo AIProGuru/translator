@@ -124,7 +124,7 @@ export default function Home() {
         }
     };
 
-  const handleAcceptQuote = async () => {
+    const handleAcceptQuote = async () => {
     if (!quoteData?.processId) return;
     setIsAcceptingQuote(true);
     try {
@@ -139,14 +139,19 @@ export default function Home() {
         setServerError(true);
         return;
       }
-      const timePerPage = ESTIMATED_TIME_PER_PAGE[adapter] || 1.5;
-      const estimatedTime = timePerPage * (quoteData.pages || 50);
-      localStorage.setItem(
-        `process_${quoteData.processId}_estimated_time`,
-        estimatedTime,
-      );
+      const data = await response.json();
       setShowQuoteModal(false);
-      router.push(`/${quoteData.processId}`);
+      if (data?.paymentUrl) {
+        router.push(data.paymentUrl);
+      } else {
+        const timePerPage = ESTIMATED_TIME_PER_PAGE[adapter] || 1.5;
+        const estimatedTime = timePerPage * (quoteData.pages || 50);
+        localStorage.setItem(
+          `process_${quoteData.processId}_estimated_time`,
+          estimatedTime,
+        );
+        router.push(`/${quoteData.processId}`);
+      }
     } catch (error) {
       console.error("Error accepting quote:", error);
       setServerError(true);

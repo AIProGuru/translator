@@ -8,6 +8,7 @@ import { useAuth } from "../context/AuthContext";
 const ADMIN_LINKS = [
   { href: "/admin/users", label: "Users" },
   { href: "/admin/prompt-templates", label: "Prompt templates" },
+  { href: "/admin/pricing-tiers", label: "Pricing tiers" },
   { href: "/admin/session-logs", label: "Audit logs" },
 ];
 

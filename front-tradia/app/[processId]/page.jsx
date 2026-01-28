@@ -109,6 +109,28 @@ export default function ProcessPage({ params }) {
                   Please accept the quote from the dashboard to start processing.
                 </p>
               </div>
+            ) : status === "payment_pending" ? (
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-blue-800 mb-4">
+                  Payment Required
+                </h2>
+                <p className="text-blue-600">
+                  Complete payment to start translation.
+                </p>
+                <button
+                  onClick={() => router.push(`/${processId}/payment`)}
+                  className="mt-6 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Go to payment
+                </button>
+              </div>
+            ) : status === "payment_confirmed" ? (
+              <div>
+                <h2 className="text-2xl font-bold text-blue-800 mb-6">
+                  Payment Confirmed
+                </h2>
+                <ProgressBar progress={progress} />
+              </div>
             ) : status === "pending" ? (
               <div>
                 <h2 className="text-2xl font-bold text-blue-800 mb-6">

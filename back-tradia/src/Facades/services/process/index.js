@@ -80,6 +80,10 @@ class ProcessFacade {
 				metadataStatus = "translating";
 			} else if (status === constants.PROCESS_STATUS.PROCESSING) {
 				metadataStatus = "processing";
+			} else if (status === constants.PROCESS_STATUS.PAYMENT_PENDING) {
+				metadataStatus = "pending";
+			} else if (status === constants.PROCESS_STATUS.PAYMENT_CONFIRMED) {
+				metadataStatus = "pending";
 			} else if (status === constants.PROCESS_STATUS.UPLOAD) {
 				metadataStatus = "processing";
 			} else if (status === constants.PROCESS_STATUS.AWAITING_ACCEPTANCE) {

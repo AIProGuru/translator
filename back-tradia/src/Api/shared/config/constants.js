@@ -57,6 +57,8 @@ module.exports = {
 		PENDING: "pending",
 		UPLOAD: "upload",
 		AWAITING_ACCEPTANCE: "awaiting_acceptance",
+		PAYMENT_PENDING: "payment_pending",
+		PAYMENT_CONFIRMED: "payment_confirmed",
 		PROCESSING: "processing",
 		TRANSLATING: "translating",
 		COMPLETED: "completed",
