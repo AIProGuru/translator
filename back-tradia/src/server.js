@@ -10,6 +10,7 @@ const promptTemplateRoutes = require("./Api/routes/prompt_templates.routes");
 const userRoutes = require("./Api/routes/user.routes");
 const pricingTierRoutes = require("./Api/routes/pricing_tiers.routes");
 const paymentRoutes = require("./Api/routes/payment.routes");
+const paymentWebhookRoutes = require("./Api/routes/payment_webhook.routes");
 const requireAuth = require("./Facades/middleware/requireAuth");
 const authenticate = require("./Api/routes/auth.routes");
 const constants = require("./Api/shared/config/constants");
@@ -31,6 +32,7 @@ app.use(
 app.use(cookieParser());
 app.use(refreshToken);
 app.use(passport.initialize());
+app.use("/api", paymentWebhookRoutes);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/api/auth", authenticate);

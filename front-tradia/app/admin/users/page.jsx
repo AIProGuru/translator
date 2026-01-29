@@ -274,6 +274,7 @@ export default function UserAdminPage() {
                     <th className="py-2">Username</th>
                     <th className="py-2">Role</th>
                     <th className="py-2">Status</th>
+                    <th className="py-2">Credit</th>
                     <th className="py-2">Updated</th>
                     <th className="py-2 text-right">Actions</th>
                   </tr>
@@ -305,6 +306,9 @@ export default function UserAdminPage() {
                           {user.status}
                         </span>
                       </td>
+                      <td className="py-2 text-gray-700">
+                        {Number(user.creditBalance || 0).toFixed(2)}
+                      </td>
                       <td className="py-2 text-xs text-gray-500">
                         {user.updatedAt
                           ? new Date(user.updatedAt).toLocaleString()
@@ -332,7 +336,7 @@ export default function UserAdminPage() {
                   ))}
                   {!users.length && (
                     <tr>
-                      <td colSpan={6} className="py-6 text-center text-gray-500">
+                      <td colSpan={7} className="py-6 text-center text-gray-500">
                         No users found.
                       </td>
                     </tr>

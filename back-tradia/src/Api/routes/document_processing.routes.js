@@ -339,6 +339,55 @@ router.post("/download/:id", requireAuth, async (req, res) => {
 		}
 		if (!filePath)
 			return res.status(500).json({ error: "Error download file" });
+		res.on("finish", async () => {
+			try {
+				const config = process?.dataValues?.config || {};
+				const payment = config.payment || {};
+				if (!payment.creditConsumed) {
+					const creditAmount =
+						Number.parseFloat(payment.creditGranted || 0) || 0;
+					if (creditAmount > 0) {
+						const userService = require("../../Facades/services/users");
+						await userService.adjustCreditBalance(
+							userId,
+							-creditAmount,
+							{
+								reason: "credit_consumed",
+								processId,
+							},
+						);
+					}
+				}
+
+				const sanitizedConfig = {
+					...(config || {}),
+					uploadPath: null,
+					images: [],
+					payment: {
+						...payment,
+						creditConsumed: true,
+						creditConsumedAt: new Date().toISOString(),
+					},
+				};
+
+				await processFacade.updateProcess(
+					processId,
+					{
+						status: "completed",
+						message: "Process completed and delivered.",
+						config: sanitizedConfig,
+						html: null,
+					},
+					userId,
+				);
+
+				if (fs.existsSync(processDir)) {
+					await fs.promises.rm(processDir, { recursive: true, force: true });
+				}
+			} catch (cleanupError) {
+				console.error("Error during cleanup:", cleanupError);
+			}
+		});
 		return res.sendFile(filePath);
 	} catch (error) {
 		res.status(500).json({

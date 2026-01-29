@@ -29,6 +29,15 @@ class ProcessRepository {
 		}
 	}
 
+	async findByIdInternal(id) {
+		try {
+			return await Process.findByPk(id);
+		} catch (error) {
+			console.error("Error al obtener el proceso (internal):", error);
+			throw new Error(`Error al obtener el proceso: ${error.message}`);
+		}
+	}
+
 	async create(data) {
 		try {
 			const newProcess = await Process.create({

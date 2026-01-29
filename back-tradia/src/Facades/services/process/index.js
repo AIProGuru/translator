@@ -26,6 +26,14 @@ class ProcessFacade {
 		return process;
 	}
 
+	async getProcessByIdInternal(id) {
+		const process = await this.processRepository.findByIdInternal(id);
+		if (!process) {
+			throw new Error("process not found");
+		}
+		return process;
+	}
+
 	async createProcess(processData) {
 		return await this.processRepository.create({
 			slug: processData.slug,

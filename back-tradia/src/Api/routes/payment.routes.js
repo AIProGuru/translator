@@ -1,16 +1,13 @@
 const express = require("express");
-const fs = require("fs");
-const path = require("path");
 const Stripe = require("stripe");
 const paypal = require("@paypal/checkout-server-sdk");
 const requireAuth = require("../../Facades/middleware/requireAuth");
 const ProcessFacade = require("../../Facades/services/process");
-const DocumentProcessingFacade = require("../../Facades/services/documents");
+const paymentService = require("../../Facades/services/payments");
 const { PROCESS_STATUS, FRONT_HOST } = require("../shared/config/constants");
 
 const router = express.Router();
 const processFacade = new ProcessFacade();
-const documentFacade = new DocumentProcessingFacade();
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
@@ -31,49 +28,6 @@ function getPaypalClient() {
 	return new paypal.core.PayPalHttpClient(environment);
 }
 
-function buildFileFromProcess(process) {
-	const config = process.config || {};
-	const uploadPath = config.uploadPath;
-	if (!uploadPath || !fs.existsSync(uploadPath)) {
-		throw new Error("Uploaded file not found for this process.");
-	}
-	return {
-		path: uploadPath,
-		originalname: config.originalFilename || path.basename(uploadPath),
-		mimetype: config.mimeType || "application/pdf",
-		size: config.fileSize || 0,
-	};
-}
-
-async function startTranslation(process, user) {
-	const config = process.config || {};
-	const file = buildFileFromProcess(process);
-	await processFacade.updateProcess(
-		process.id,
-		{
-			status: PROCESS_STATUS.PAYMENT_CONFIRMED,
-			message: "Payment confirmed. Starting translation.",
-			config: {
-				...config,
-				payment: {
-					...(config.payment || {}),
-					status: PROCESS_STATUS.PAYMENT_CONFIRMED,
-					confirmedAt: new Date().toISOString(),
-				},
-			},
-		},
-		user.id,
-	);
-
-	setImmediate(() => {
-		documentFacade.processDocument({
-			user,
-			process,
-			file,
-			body: config.translation || {},
-		});
-	});
-}
 
 router.post("/payments/stripe/session", requireAuth, async (req, res) => {
 	try {
@@ -87,22 +41,32 @@ router.post("/payments/stripe/session", requireAuth, async (req, res) => {
 			return res.status(400).json({ error: "processId is required." });
 		}
 
-		const process = await processFacade.getProcessById(processId, req.user.id);
+	const process = await processFacade.getProcessById(processId, req.user.id);
+	if (process.status !== PROCESS_STATUS.PAYMENT_PENDING) {
+		return res.status(400).json({ error: "Process is not awaiting payment." });
+	}
 		if (process.status !== PROCESS_STATUS.PAYMENT_PENDING) {
 			return res.status(400).json({ error: "Process is not awaiting payment." });
 		}
 
-		const pricingQuote = process.config?.pricingQuote;
-		if (!pricingQuote?.totalCost || !pricingQuote?.currency) {
-			return res.status(400).json({ error: "Pricing quote is missing." });
-		}
+	const pricingQuote = process.config?.pricingQuote;
+	if (!pricingQuote?.totalCost || !pricingQuote?.currency) {
+		return res.status(400).json({ error: "Pricing quote is missing." });
+	}
+	const paypalAmount = Number.parseFloat(pricingQuote.totalCost || 0);
+	if (!Number.isFinite(paypalAmount) || paypalAmount <= 0) {
+		return res.status(400).json({ error: "Invalid pricing amount." });
+	}
 
 		const stripe = new Stripe(STRIPE_SECRET_KEY, {
 			apiVersion: "2024-06-20",
 		});
 
-		const amount = Math.round(Number(pricingQuote.totalCost) * 100);
-		const currency = pricingQuote.currency.toLowerCase();
+	const amount = Math.round(Number(pricingQuote.totalCost) * 100);
+	const currency = pricingQuote.currency.toLowerCase();
+	if (!Number.isFinite(amount) || amount <= 0) {
+		return res.status(400).json({ error: "Invalid pricing amount." });
+	}
 
 		const session = await stripe.checkout.sessions.create({
 			mode: "payment",
@@ -165,12 +129,25 @@ router.post("/payments/stripe/confirm", requireAuth, async (req, res) => {
 			apiVersion: "2024-06-20",
 		});
 
-		const session = await stripe.checkout.sessions.retrieve(sessionId);
-		if (session.payment_status !== "paid") {
-			return res.status(400).json({ error: "Payment not completed." });
-		}
+	const session = await stripe.checkout.sessions.retrieve(sessionId);
+	if (session.payment_status !== "paid") {
+		return res.status(400).json({ error: "Payment not completed." });
+	}
+	if (session.metadata?.processId && session.metadata.processId !== String(processId)) {
+		return res.status(400).json({ error: "Payment does not match this process." });
+	}
+	const expectedAmount = Math.round(
+		Number(process.config?.pricingQuote?.totalCost || 0) * 100,
+	);
+	if (
+		Number.isFinite(expectedAmount) &&
+		expectedAmount > 0 &&
+		session.amount_total !== expectedAmount
+	) {
+		return res.status(400).json({ error: "Payment amount mismatch." });
+	}
 
-		await startTranslation(process, req.user);
+		await paymentService.startTranslation(process, req.user.id);
 		return res.json({ message: "Payment confirmed. Translation started." });
 	} catch (error) {
 		return res.status(500).json({ error: error.message });
@@ -189,7 +166,16 @@ router.post("/payments/paypal/order", requireAuth, async (req, res) => {
 			return res.status(400).json({ error: "processId is required." });
 		}
 
-		const process = await processFacade.getProcessById(processId, req.user.id);
+	const process = await processFacade.getProcessById(processId, req.user.id);
+	if (process.status !== PROCESS_STATUS.PAYMENT_PENDING) {
+		return res.status(400).json({ error: "Process is not awaiting payment." });
+	}
+	if (
+		process.config?.payment?.orderId &&
+		process.config.payment.orderId !== orderId
+	) {
+		return res.status(400).json({ error: "Payment does not match this process." });
+	}
 		if (process.status !== PROCESS_STATUS.PAYMENT_PENDING) {
 			return res.status(400).json({ error: "Process is not awaiting payment." });
 		}
@@ -206,9 +192,10 @@ router.post("/payments/paypal/order", requireAuth, async (req, res) => {
 			purchase_units: [
 				{
 					description: `Translation service ${processId}`,
+					custom_id: String(processId),
 					amount: {
 						currency_code: pricingQuote.currency,
-						value: pricingQuote.totalCost.toString(),
+						value: paypalAmount.toFixed(2),
 					},
 				},
 			],
@@ -270,7 +257,7 @@ router.post("/payments/paypal/capture", requireAuth, async (req, res) => {
 			return res.status(400).json({ error: "Payment not completed." });
 		}
 
-		await startTranslation(process, req.user);
+		await paymentService.startTranslation(process, req.user.id);
 		return res.json({ message: "Payment confirmed. Translation started." });
 	} catch (error) {
 		return res.status(500).json({ error: error.message });

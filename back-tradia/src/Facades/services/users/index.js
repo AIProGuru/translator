@@ -99,6 +99,7 @@ function serializeUser(user) {
     lastLoginIp: plain.last_login_ip,
     createdAt: plain.createdAt,
     updatedAt: plain.updatedAt,
+    creditBalance: Number.parseFloat(plain.credit_balance || 0),
   };
 }
 
@@ -485,6 +486,39 @@ async function ensureAdminAccount() {
   }
 }
 
+async function adjustCreditBalance(userId, delta, { reason, processId } = {}) {
+  const user = await userRepository.findById(userId);
+  if (!user) {
+    throw new Error("User not found.");
+  }
+  const current = Number.parseFloat(user.credit_balance || 0);
+  const change = Number.parseFloat(delta || 0);
+  if (!Number.isFinite(change)) {
+    throw new Error("Invalid credit delta.");
+  }
+  const nextBalance = Number.parseFloat((current + change).toFixed(2));
+  if (nextBalance < 0) {
+    throw new Error("Insufficient credit balance.");
+  }
+  await userRepository.update(userId, {
+    credit_balance: nextBalance,
+  });
+
+  await logSessionEvent({
+    userId,
+    event: "credit_balance_update",
+    success: true,
+    metadata: {
+      reason: reason || null,
+      processId: processId || null,
+      delta: change,
+      balance: nextBalance,
+    },
+  });
+
+  return nextBalance;
+}
+
 module.exports = {
   ROLE_LABELS,
   sanitizeUsername,
@@ -501,4 +535,5 @@ module.exports = {
   ensureAdminAccount,
   logSessionEvent,
   findOrCreateGoogleUser,
+  adjustCreditBalance,
 };

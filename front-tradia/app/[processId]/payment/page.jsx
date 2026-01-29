@@ -13,13 +13,13 @@ export default function PaymentPage({ params }) {
   const searchParams = useSearchParams();
   const { processId } = use(params);
   const { safeFetch, setServerError } = useSafeFetch();
-  const [process, setProcess] = useState(null);
+  const [processData, setProcessData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [error, setError] = useState("");
 
-  const pricingQuote = process?.config?.pricingQuote || null;
-  const payment = process?.config?.payment || null;
+  const pricingQuote = processData?.config?.pricingQuote || null;
+  const payment = processData?.config?.payment || null;
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
   const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
@@ -40,7 +40,7 @@ export default function PaymentPage({ params }) {
           throw new Error(data.error || "Unable to load process.");
         }
         const data = await res.json();
-        setProcess(data);
+        setProcessData(data);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -76,8 +76,8 @@ export default function PaymentPage({ params }) {
           throw new Error(data.error || "Unable to confirm payment.");
         }
         const timePerPage =
-          ESTIMATED_TIME_PER_PAGE[process?.config?.translation?.adapter] || 1.5;
-        const estimatedTime = timePerPage * (process?.config?.pageCount || 50);
+          ESTIMATED_TIME_PER_PAGE[processData?.config?.translation?.adapter] || 1.5;
+        const estimatedTime = timePerPage * (processData?.config?.pageCount || 50);
         localStorage.setItem(
           `process_${processId}_estimated_time`,
           estimatedTime,
@@ -156,8 +156,8 @@ export default function PaymentPage({ params }) {
       }
 
       const timePerPage =
-        ESTIMATED_TIME_PER_PAGE[process?.config?.translation?.adapter] || 1.5;
-      const estimatedTime = timePerPage * (process?.config?.pageCount || 50);
+        ESTIMATED_TIME_PER_PAGE[processData?.config?.translation?.adapter] || 1.5;
+      const estimatedTime = timePerPage * (processData?.config?.pageCount || 50);
       localStorage.setItem(
         `process_${processId}_estimated_time`,
         estimatedTime,
@@ -245,16 +245,16 @@ export default function PaymentPage({ params }) {
             </div>
           )}
 
-          {!isLoading && process && (
+          {!isLoading && processData && (
             <div className="space-y-4 text-sm text-gray-700">
               <div className="flex justify-between">
                 <span>Process ID</span>
-                <span className="font-medium">{process.id}</span>
+                <span className="font-medium">{processData.id}</span>
               </div>
               <div className="flex justify-between">
                 <span>Word count</span>
                 <span className="font-medium">
-                  {pricingQuote?.wordCount ?? process.config?.wordCount ?? 0}
+                  {pricingQuote?.wordCount ?? processData.config?.wordCount ?? 0}
                 </span>
               </div>
               <div className="flex justify-between">
