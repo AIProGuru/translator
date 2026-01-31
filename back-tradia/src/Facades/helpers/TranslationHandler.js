@@ -132,10 +132,11 @@ class TranslationHandler {
 			config.adapter ||
 			previousTranslation.adapter ||
 			"openai";
-		const language =
+		const language = this._normalizeLanguageName(
 			config.language ||
-			previousTranslation.language ||
-			"spanish";
+				previousTranslation.language ||
+				"spanish",
+		);
 		const cycles = this._toInteger(
 			config.cycles,
 			previousTranslation.cycles,
@@ -145,11 +146,12 @@ class TranslationHandler {
 			config.documentType,
 			previousTranslation.documentType,
 		);
-		const userPrompt = (
+		const baseUserPrompt = (
 			(config.prompt ?? null) ??
 			previousTranslation.prompt ??
 			""
 		).trim();
+		const userPrompt = this._enforceLanguagePrompt(baseUserPrompt, language);
 		const templatePrompt =
 			previousTranslation.templatePrompt ||
 			documentType.prompt ||
@@ -168,6 +170,37 @@ class TranslationHandler {
 			templatePrompt,
 			documentType,
 		};
+	}
+
+	_normalizeLanguageName(value) {
+		const raw = (value || "").toString().trim();
+		const key = raw.toLowerCase();
+		const map = {
+			english: "English",
+			spanish: "Spanish",
+			french: "French",
+			german: "German",
+			italian: "Italian",
+			portuguese: "Portuguese",
+			chinese: "Chinese",
+			japanese: "Japanese",
+			russian: "Russian",
+			arabic: "Arabic",
+		};
+		if (map[key]) return map[key];
+		return raw
+			.split(" ")
+			.map((part) =>
+				part.length ? part[0].toUpperCase() + part.slice(1).toLowerCase() : "",
+			)
+			.join(" ");
+	}
+
+	_enforceLanguagePrompt(existingPrompt, language) {
+		const enforcement = `\n\nIMPORTANT: Translate ALL text into ${language}. Do NOT leave any source-language text in the output. If a sentence is already in another language, rewrite it in ${language} anyway.\n`;
+		if (!existingPrompt) return enforcement.trim();
+		if (existingPrompt.includes("Translate ALL text into")) return existingPrompt;
+		return `${existingPrompt}${enforcement}`;
 	}
 
 	_buildDocumentTypeConfig(inputDocType = {}, fallback = {}) {
