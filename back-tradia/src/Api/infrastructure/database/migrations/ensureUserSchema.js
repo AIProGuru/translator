@@ -62,6 +62,14 @@ module.exports = async function ensureUserSchema(sequelize) {
   }
 
   if (tableDescription.username) {
+    if (!tableDescription.credit_balance) {
+      await queryInterface.addColumn("user", "credit_balance", {
+        type: DataTypes.DECIMAL(12, 2),
+        allowNull: false,
+        defaultValue: 0,
+      });
+      console.log("[DB] Added credit_balance column to user table.");
+    }
     return;
   }
 
@@ -138,6 +146,11 @@ module.exports = async function ensureUserSchema(sequelize) {
     displayName: {
       type: DataTypes.STRING,
       allowNull: true,
+    },
+    credit_balance: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: false,
+      defaultValue: 0,
     },
     createdAt: {
       type: DataTypes.DATE,
