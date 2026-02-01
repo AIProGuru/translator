@@ -433,8 +433,21 @@ router.get("/preview/translated/:id", requireAuth, async (req, res) => {
 		const userId = req.user.id;
 
 		const process = await processFacade.getProcessById(processId, userId);
+		const isPaymentPending =
+			process?.dataValues?.status === PROCESS_STATUS.PAYMENT_PENDING;
+		const previewConfig = process?.dataValues?.config?.preview || {};
 		let output_html = process?.dataValues?.html;
-		let dimensions = process?.dataValues?.pages_info[0].dimensions;
+		let pagesInfo = process?.dataValues?.pages_info || [];
+
+		if (isPaymentPending) {
+			if (!previewConfig?.html) {
+				return res.status(409).json({ error: "Preview not ready." });
+			}
+			output_html = previewConfig.html;
+			pagesInfo = previewConfig.pages_info || [];
+		}
+
+		let dimensions = pagesInfo?.[0]?.dimensions;
 
 		const processDir = fileManagement.createProcessDirectory(processId);
 		let filePath = "";
@@ -472,8 +485,21 @@ router.get(
 			const userId = req.user.id;
 
 			const process = await processFacade.getProcessById(processId, userId);
+			const isPaymentPending =
+				process?.dataValues?.status === PROCESS_STATUS.PAYMENT_PENDING;
+			const previewConfig = process?.dataValues?.config?.preview || {};
 			let output_html = process?.dataValues?.html;
-			let dimensions = process?.dataValues?.pages_info[0].dimensions;
+			let pagesInfo = process?.dataValues?.pages_info || [];
+
+			if (isPaymentPending) {
+				if (!previewConfig?.html) {
+					return res.status(409).json({ error: "Preview not ready." });
+				}
+				output_html = previewConfig.html;
+				pagesInfo = previewConfig.pages_info || [];
+			}
+
+			let dimensions = pagesInfo?.[0]?.dimensions;
 
 			const processDir = fileManagement.createProcessDirectory(processId);
 			let filePath = "";

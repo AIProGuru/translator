@@ -17,7 +17,8 @@ class FileProcessor {
 		return this._fileManager.getUploadMiddleware();
 	}
 
-	async handleFileConversion(file, process, processPath, userId) {
+	async handleFileConversion(file, process, processPath, userId, options = {}) {
+		const { skipStatusUpdate = false } = options;
 		const fileExtension = path.extname(file.originalname).toLowerCase();
 		const isImage = [
 			".jpg",
@@ -58,12 +59,18 @@ class FileProcessor {
 		);
 		process.config.images = result.images;
 
-		await this._processFacade.updateProcess(process.id, {
-			status: constants.PROCESS_STATUS.UPLOAD,
-			message: 'The PDF was uploaded for translation.',
-			progress: 10,
-		  }, userId);
-		  console.log("Empezando a subir los archivos")
+		if (!skipStatusUpdate) {
+			await this._processFacade.updateProcess(
+				process.id,
+				{
+					status: constants.PROCESS_STATUS.UPLOAD,
+					message: "The PDF was uploaded for translation.",
+					progress: 10,
+				},
+				userId,
+			);
+			console.log("Empezando a subir los archivos");
+		}
 	}
 
 	createProcessDirectory(processId) {

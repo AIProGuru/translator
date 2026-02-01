@@ -16,6 +16,8 @@ module.exports = {
 		parseInt(process.env.METADATA_RETENTION_DAYS || "365", 10) || 365,
 	CONCURRENCY: 2,
 	LIMITS_PAGES: process.env.LIMITS_PAGES || 0,
+	PREVIEW_PAGE_LIMIT:
+		parseInt(process.env.PREVIEW_PAGE_LIMIT || "3", 10) || 3,
 
 	DATABASE: {
 		name: "database",

@@ -115,14 +115,23 @@ export default function ProcessPage({ params }) {
                   Payment Required
                 </h2>
                 <p className="text-blue-600">
-                  Complete payment to start translation.
+                  Review a 3-page translated preview, then proceed to pay for the
+                  full document translation.
                 </p>
-                <button
-                  onClick={() => router.push(`/${processId}/payment`)}
-                  className="mt-6 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Go to payment
-                </button>
+                <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={handlePreview}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  >
+                    View 3-page preview
+                  </button>
+                  <button
+                    onClick={() => router.push(`/${processId}/payment`)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Go to payment
+                  </button>
+                </div>
               </div>
             ) : status === "payment_confirmed" ? (
               <div>

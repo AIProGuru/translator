@@ -126,6 +126,64 @@ class TranslationHandler {
 		return translations;
 	}
 
+	async generatePreviewTranslation({ process, processPath, config, maxPages }) {
+		if (!this._llm) {
+			throw new Error("Error on init LLM");
+		}
+
+		const pages = await this._fileManager.getImagesFromPath(processPath);
+		if (!pages || pages.length === 0) {
+			throw new Error("Pages to translate not found");
+		}
+
+		const safeLimit =
+			Number.isFinite(maxPages) && maxPages > 0 ? maxPages : pages.length;
+		const previewPages = pages.slice(0, safeLimit);
+
+		const hours = 10;
+		const translations = await Promise.race([
+			this._llm.run(previewPages),
+			new Promise((_, reject) =>
+				setTimeout(
+					() =>
+						reject(
+							new Error(
+								"Timeout Error when translations pages width LLM",
+							),
+						),
+					hours * 60 * 60 * 1000,
+				),
+			),
+		]);
+		if (!translations || translations.length === 0) {
+			throw new Error("Error: translations results is empty");
+		}
+
+		const html_data = translations.map(({ html, page_info }) => {
+			return {
+				html,
+				html_info: {
+					page_number: page_info.pageNumber,
+					dimensions: page_info.dimensions,
+				},
+			};
+		});
+		const mergedHtml = this._htmlJoiner.join(html_data);
+
+		if (!mergedHtml) {
+			throw new Error("Error al unir documentos HTML");
+		}
+
+		const pages_info = previewPages.map(({ page_info }) => page_info);
+
+		return {
+			html: mergedHtml,
+			pages_info,
+			previewPageCount: previewPages.length,
+			translationsCount: translations.length,
+		};
+	}
+
 	_normalizeTranslationConfig(config = {}, process) {
 		const previousTranslation = process?.config?.translation || {};
 		const adapter =

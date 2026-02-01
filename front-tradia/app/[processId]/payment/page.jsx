@@ -277,6 +277,16 @@ export default function PaymentPage({ params }) {
 
           {!isLoading && (
             <div className="space-y-4">
+              <div className="rounded border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700 flex items-center justify-between gap-2">
+                <span>Want to review the 3-page translated preview first?</span>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/${processId}/preview`)}
+                  className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  View preview
+                </button>
+              </div>
               <div className="grid gap-3 md:grid-cols-2">
                 <button
                   type="button"

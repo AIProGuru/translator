@@ -3,6 +3,7 @@
 import { use, useEffect, useState, useCallback, useRef } from "react";
 import ProtectedRoute from "../../../components/ProtectedRoute";
 import { BACK_HOST } from "@/lib/constants";
+import { useSafeFetch } from "@/hooks/useSafeFetch";
 import { useAuth } from "../../../context/AuthContext";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import ReactCrop from "react-image-crop";
@@ -111,6 +112,7 @@ function DraggablePatch({ patch }) {
 export default function PreviewPage({ params }) {
   const { processId } = use(params);
   const { token } = useAuth();
+  const { safeFetch } = useSafeFetch();
 
   const originalPdfUrl = token
     ? `${BACK_HOST}/api/preview/original/${processId}?token=${encodeURIComponent(
@@ -133,6 +135,9 @@ export default function PreviewPage({ params }) {
     : `${BACK_HOST}/api/preview/translated-clean/${processId}`;
 
   const [message, setMessage] = useState("");
+  const [previewStatus, setPreviewStatus] = useState("");
+  const [processData, setProcessData] = useState(null);
+  const [previewLimit, setPreviewLimit] = useState(null);
   const [cropImageUrl, setCropImageUrl] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [crop, setCrop] = useState({
@@ -339,6 +344,26 @@ export default function PreviewPage({ params }) {
     );
   }, [processId, token, currentPage]);
 
+  useEffect(() => {
+    if (!processId) return;
+    const loadProcess = async () => {
+      try {
+        const res = await safeFetch(`${BACK_HOST}/api/processes/${processId}`, {
+          credentials: "include",
+        });
+        if (!res?.ok) return;
+        const data = await res.json();
+        setProcessData(data);
+        const preview = data?.config?.preview || {};
+        const limit = preview.maxPages || preview.pages || null;
+        setPreviewLimit(limit);
+      } catch (err) {
+        // Silent: preview can still load without this metadata.
+      }
+    };
+    loadProcess();
+  }, [processId, safeFetch]);
+
   // Load translated PDF once for client-side page rendering
   useEffect(() => {
     let cancelled = false;
@@ -347,12 +372,27 @@ export default function PreviewPage({ params }) {
         const res = await fetch(translatedPdfPreviewUrl, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
-        if (!res.ok) return;
+        if (res.status === 409) {
+          if (!cancelled) {
+            setPreviewStatus(
+              "Preview is still being generated. We'll refresh automatically.",
+            );
+            setTimeout(() => {
+              if (!cancelled) loadPdf();
+            }, 3000);
+          }
+          return;
+        }
+        if (!res.ok) {
+          setPreviewStatus("Unable to load preview yet.");
+          return;
+        }
         const buffer = await res.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
         if (cancelled) return;
         setTranslatedPdfDoc(pdf);
         setTranslatedNumPages(pdf.numPages || 1);
+        setPreviewStatus("");
       } catch (error) {
         console.error("Error loading translated PDF for preview:", error);
       }
@@ -1763,6 +1803,26 @@ export default function PreviewPage({ params }) {
   return (
     <ProtectedRoute>
       <main className="container mx-auto px-4 py-8">
+        {processData?.status === "payment_pending" && (
+          <div className="mb-4 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <span>
+              Preview limited to the first {previewLimit || 3} pages. Pay to
+              unlock the full translation.
+            </span>
+            <button
+              type="button"
+              onClick={() => window.location.assign(`/${processId}/payment`)}
+              className="px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              Go to payment
+            </button>
+          </div>
+        )}
+        {previewStatus && (
+          <div className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded">
+            {previewStatus}
+          </div>
+        )}
         {message && (
           <div className="mb-4 text-sm text-blue-700 bg-blue-50 border border-blue-200 px-3 py-2 rounded">
             {message}

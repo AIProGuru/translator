@@ -46,6 +46,7 @@ async function startTranslation(process, userIdOverride = null) {
 			message: "Payment confirmed. Starting translation.",
 			config: {
 				...config,
+				preview: null,
 				payment: {
 					...(config.payment || {}),
 					status: PROCESS_STATUS.PAYMENT_CONFIRMED,

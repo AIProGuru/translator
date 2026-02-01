@@ -2,7 +2,11 @@ const express = require("express");
 const ProcessFacade = require("../../Facades/services/process");
 const requireAuth = require("../../Facades/middleware/requireAuth");
 const DocumentProcessingFacade = require("../../Facades/services/documents");
-const { PROCESS_STATUS, FRONT_HOST } = require("../shared/config/constants");
+const {
+	PROCESS_STATUS,
+	FRONT_HOST,
+	PREVIEW_PAGE_LIMIT,
+} = require("../shared/config/constants");
 const fs = require("fs");
 const path = require("path");
 
@@ -115,6 +119,18 @@ router.post("/processes/:id/accept", requireAuth, async (req, res) => {
 			},
 			userId,
 		);
+
+		setImmediate(async () => {
+			try {
+				await documentFacade.generatePreviewTranslation({
+					processId,
+					userId,
+					maxPages: PREVIEW_PAGE_LIMIT,
+				});
+			} catch (previewError) {
+				console.error("Error generating preview translation:", previewError);
+			}
+		});
 
 		const paymentUrl = `${FRONT_HOST}/${processId}/payment`;
 		res.json({ message: "Payment required.", paymentUrl });
