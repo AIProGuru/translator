@@ -78,12 +78,22 @@ class FileManagementService {
 			}
 		});
 
+		const sanitizeName = (name = "") =>
+			name
+				.toString()
+				.replace(/[^a-z0-9.\-_]+/gi, "_")
+				.replace(/_+/g, "_")
+				.slice(0, 120);
+
 		this._storage = multer.diskStorage({
 			destination: (req, file, cb) => {
 				cb(null, constants.UPLOAD_DIR);
 			},
 			filename: (req, file, cb) => {
-				cb(null, file.originalname);
+				const ext = path.extname(file.originalname || "");
+				const base = sanitizeName(path.basename(file.originalname || "upload", ext));
+				const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+				cb(null, `${base}-${unique}${ext || ""}`);
 			},
 		});
 
