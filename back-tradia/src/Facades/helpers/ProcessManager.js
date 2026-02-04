@@ -26,6 +26,7 @@ class ProcessManager {
 	async createProcessRecord(file, userId, translationConfig = {}, jobMeta = {}) {
 		const safeCycles = Number.parseInt(translationConfig.cycles, 10);
 		const docType = translationConfig.documentType || {};
+		const language = this._normalizeLanguageName(translationConfig.language);
 		const normalizedDocumentType = {
 			id: docType.id ?? null,
 			key: docType.key || docType.id || "custom",
@@ -40,7 +41,7 @@ class ProcessManager {
 
 		const normalizedTranslationConfig = {
 			adapter: translationConfig.adapter || "openai",
-			language: translationConfig.language || "spanish",
+			language: language || "Spanish",
 			sourceLanguage: translationConfig.sourceLanguage || "auto",
 			cycles: Number.isNaN(safeCycles) ? 0 : safeCycles,
 			prompt: translationConfig.prompt || "",
@@ -85,6 +86,30 @@ class ProcessManager {
 		});
 
 		return process;
+	}
+
+	_normalizeLanguageName(value) {
+		const raw = (value || "").toString().trim();
+		const key = raw.toLowerCase();
+		const map = {
+			english: "English",
+			spanish: "Spanish",
+			french: "French",
+			german: "German",
+			italian: "Italian",
+			portuguese: "Portuguese",
+			chinese: "Chinese",
+			japanese: "Japanese",
+			russian: "Russian",
+			arabic: "Arabic",
+		};
+		if (map[key]) return map[key];
+		return raw
+			.split(" ")
+			.map((part) =>
+				part.length ? part[0].toUpperCase() + part.slice(1).toLowerCase() : "",
+			)
+			.join(" ");
 	}
 
 	async finalizeProcess(process, processPath, translations,userId) {
