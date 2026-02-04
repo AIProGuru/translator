@@ -138,6 +138,7 @@ export default function PreviewPage({ params }) {
   const [previewStatus, setPreviewStatus] = useState("");
   const [processData, setProcessData] = useState(null);
   const [previewLimit, setPreviewLimit] = useState(null);
+  const [previewReady, setPreviewReady] = useState(false);
   const [cropImageUrl, setCropImageUrl] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [crop, setCrop] = useState({
@@ -346,6 +347,10 @@ export default function PreviewPage({ params }) {
 
   useEffect(() => {
     if (!processId) return;
+    let cancelled = false;
+    let timeoutId;
+    const previewPollMs = 3000;
+
     const loadProcess = async () => {
       try {
         const res = await safeFetch(`${BACK_HOST}/api/processes/${processId}`, {
@@ -353,15 +358,35 @@ export default function PreviewPage({ params }) {
         });
         if (!res?.ok) return;
         const data = await res.json();
+        if (cancelled) return;
         setProcessData(data);
         const preview = data?.config?.preview || {};
         const limit = preview.maxPages || preview.pages || null;
         setPreviewLimit(limit);
+
+        const status = data?.status;
+        const previewAvailable = Boolean(preview?.html);
+        const fullAvailable = Boolean(data?.html);
+        const isReady =
+          status === "payment_pending" ? previewAvailable : fullAvailable;
+        setPreviewReady(isReady || false);
+
+        if (!isReady && !cancelled) {
+          timeoutId = setTimeout(loadProcess, previewPollMs);
+        }
       } catch (err) {
         // Silent: preview can still load without this metadata.
+        if (!cancelled) {
+          timeoutId = setTimeout(loadProcess, previewPollMs);
+        }
       }
     };
+
     loadProcess();
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [processId, safeFetch]);
 
   // Load translated PDF once for client-side page rendering
@@ -369,6 +394,12 @@ export default function PreviewPage({ params }) {
     let cancelled = false;
     const loadPdf = async () => {
       try {
+        if (!previewReady) {
+          setPreviewStatus(
+            "Preview is still being generated. We'll refresh automatically.",
+          );
+          return;
+        }
         const res = await fetch(translatedPdfPreviewUrl, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
@@ -401,7 +432,7 @@ export default function PreviewPage({ params }) {
     return () => {
       cancelled = true;
     };
-  }, [translatedPdfPreviewUrl, token]);
+  }, [translatedPdfPreviewUrl, token, previewReady]);
 
   // Render the current translated page into the canvas
   useEffect(() => {
@@ -1799,6 +1830,8 @@ export default function PreviewPage({ params }) {
     completedCrop &&
     completedCrop.width >= 5 &&
     completedCrop.height >= 5;
+  const isPreviewPending =
+    processData?.status === "payment_pending" && !previewReady;
 
   return (
     <ProtectedRoute>
@@ -1821,6 +1854,19 @@ export default function PreviewPage({ params }) {
         {previewStatus && (
           <div className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded">
             {previewStatus}
+          </div>
+        )}
+        {isPreviewPending && (
+          <div className="mb-4 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-blue-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-6 w-6 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" />
+              <div className="text-sm font-medium">
+                Translating the first {previewLimit || 3} pages for preview...
+              </div>
+            </div>
+            <div className="text-xs text-blue-700">
+              This usually takes a minute. We will refresh automatically.
+            </div>
           </div>
         )}
         {message && (
@@ -2380,6 +2426,20 @@ export default function PreviewPage({ params }) {
                     ref={translatedCanvasRef}
                     className="block bg-white w-full h-auto"
                   />
+                  {isPreviewPending && (
+                    <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-3 text-center px-4">
+                        <div className="h-10 w-10 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin" />
+                        <div className="text-sm font-semibold text-blue-900">
+                          Translating preview pages...
+                        </div>
+                        <div className="text-xs text-blue-700">
+                          Please wait while we prepare the first{" "}
+                          {previewLimit || 3} pages.
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {/* Drop & overlay area over current page canvas */}
                   <div
                     ref={translatedOverlayRef}
