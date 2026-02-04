@@ -87,7 +87,15 @@ class DocumentProcessingFacade {
 		const config = process.config || {};
 		const previewConfig = config.preview || {};
 		if (previewConfig.html && previewConfig.pages_info?.length) {
-			return { skipped: true, reason: "preview_exists" };
+			const targetLanguage = config.translation?.language || "spanish";
+			const previewLooksOk =
+				this._translationHandler.isMergedHtmlInTargetLanguage(
+					previewConfig.html,
+					targetLanguage,
+				);
+			if (previewLooksOk) {
+				return { skipped: true, reason: "preview_exists" };
+			}
 		}
 
 		const processPath = this._fileProcessor.createProcessDirectory(

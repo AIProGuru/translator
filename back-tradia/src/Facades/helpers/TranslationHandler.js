@@ -192,7 +192,13 @@ class TranslationHandler {
 		].includes(target);
 		if (isLatinTarget) {
 			// If a Latin target still contains lots of non-Latin script, retry.
-			if (cjkCount + arabicCount + cyrillicCount >= 8) {
+			if (cjkCount + arabicCount + cyrillicCount >= 3) {
+				return true;
+			}
+			if (alphaWordCount === 0 && (cjkCount + arabicCount + cyrillicCount) > 0) {
+				return true;
+			}
+			if (alphaWordCount < 6 && (cjkCount + arabicCount + cyrillicCount) > 0) {
 				return true;
 			}
 			if (alphaWordCount < 12) {
@@ -235,6 +241,35 @@ class TranslationHandler {
 			if (stopwords.has(normalizedWord)) hits += 1;
 		}
 		return hits < 2;
+	}
+
+	_extractPagesFromMergedHtml(html) {
+		if (!html) return [];
+		const pages = [];
+		const regex = /<page\b[^>]*id=["']page-(\d+)["'][^>]*>[\s\S]*?<\/page>/gi;
+		let match;
+		while ((match = regex.exec(html)) !== null) {
+			pages.push({
+				pageNumber: Number.parseInt(match[1], 10),
+				html: match[0],
+			});
+		}
+		if (!pages.length) {
+			pages.push({ pageNumber: 1, html });
+		}
+		return pages;
+	}
+
+	isMergedHtmlInTargetLanguage(mergedHtml, targetLanguage) {
+		const pages = this._extractPagesFromMergedHtml(mergedHtml);
+		if (!pages.length) return true;
+		for (const page of pages) {
+			const text = this._extractVisibleText(page.html);
+			if (this._shouldRetryTranslation(text, targetLanguage)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	_buildLanguageRetryPrompt(targetLanguage) {
