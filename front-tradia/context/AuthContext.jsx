@@ -58,13 +58,23 @@ const persistToken = (value) => {
 };
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => readStoredUser());
-  const [token, setToken] = useState(() => readStoredToken());
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasHydrated, setHasHydrated] = useState(false);
   const { setServerError } = useServerError();
   const router = useRouter();
 
   useEffect(() => {
+    const storedUser = readStoredUser();
+    const storedToken = readStoredToken();
+    if (storedUser) setUser(storedUser);
+    if (storedToken) setToken(storedToken);
+    setHasHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasHydrated) return;
     let isMounted = true;
     const controller = new AbortController();
 

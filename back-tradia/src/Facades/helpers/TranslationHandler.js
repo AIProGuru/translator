@@ -173,11 +173,32 @@ class TranslationHandler {
 		const normalized = text.toLowerCase();
 		const words = normalized.match(/[a-z\u00c0-\u024f]+/gi) || [];
 		const alphaWordCount = words.length;
-		if (alphaWordCount < 12) {
-			return false;
-		}
+		const cjkCount = this._countScriptMatches(
+			text,
+			/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/g,
+		);
+		const arabicCount = this._countScriptMatches(text, /[\u0600-\u06ff]/g);
+		const cyrillicCount = this._countScriptMatches(text, /[\u0400-\u04ff]/g);
 
 		const target = (targetLanguage || "").toLowerCase();
+
+		const isLatinTarget = [
+			"english",
+			"spanish",
+			"french",
+			"german",
+			"italian",
+			"portuguese",
+		].includes(target);
+		if (isLatinTarget) {
+			// If a Latin target still contains lots of non-Latin script, retry.
+			if (cjkCount + arabicCount + cyrillicCount >= 8) {
+				return true;
+			}
+			if (alphaWordCount < 12) {
+				return false;
+			}
+		}
 
 		if (target === "chinese") {
 			return (
