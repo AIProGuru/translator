@@ -28,7 +28,7 @@ export default function UploadArea({ file, setFile }) {
         {...getRootProps()}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
-        className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors duration-300 ${
+        className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors duration-300 ${
           isDragActive
             ? "border-blue-500 bg-blue-50"
             : file
@@ -46,7 +46,7 @@ export default function UploadArea({ file, setFile }) {
               className="flex justify-center"
             >
               <svg
-                className="w-16 h-16 text-green-500"
+                className="w-12 h-12 text-green-500"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -60,7 +60,7 @@ export default function UploadArea({ file, setFile }) {
                 />
               </svg>
             </motion.div>
-            <h3 className="text-xl font-semibold text-green-700">Selected Document</h3>
+            <h3 className="text-lg font-semibold text-green-700">Selected Document</h3>
             <p className="text-green-600">{file.name}</p>
             <p className="text-sm text-green-500">Click or drag to change the document</p>
           </div>
@@ -72,7 +72,7 @@ export default function UploadArea({ file, setFile }) {
               className="flex justify-center"
             >
               <svg
-                className="w-16 h-16 text-blue-500"
+                className="w-12 h-12 text-blue-500"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -86,7 +86,7 @@ export default function UploadArea({ file, setFile }) {
                 />
               </svg>
             </motion.div>
-            <h3 className="text-xl font-semibold text-blue-700">Drag & drop files here</h3>
+            <h3 className="text-lg font-semibold text-blue-700">Drag & drop files here</h3>
           </div>
         ) : (
           <div className="space-y-4">
@@ -96,7 +96,7 @@ export default function UploadArea({ file, setFile }) {
               className="flex justify-center"
             >
               <svg
-                className="w-16 h-16 text-blue-400"
+                className="w-12 h-12 text-blue-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -110,7 +110,7 @@ export default function UploadArea({ file, setFile }) {
                 />
               </svg>
             </motion.div>
-            <h3 className="text-xl font-semibold text-blue-700">Drag and drop your PDF document here</h3>
+            <h3 className="text-lg font-semibold text-blue-700">Drag and drop your PDF document here</h3>
             <p className="text-blue-600">or click to select a file</p>
             <p className="text-sm text-blue-400">PDF file only</p>
           </div>

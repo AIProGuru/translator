@@ -234,7 +234,7 @@ export default function SessionLogsAdminPage() {
           ) : logs.length === 0 ? (
             <p className="px-6 py-4 text-sm text-gray-500">No events found for the current filter.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase text-gray-500">

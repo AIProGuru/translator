@@ -346,185 +346,188 @@ export default function UserAdminPage() {
             </div>
           )}
         </section>
-
         {editingId && (
-          <section className="bg-white rounded-xl shadow p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-800">
-                {editingId === "new" ? "Create user" : "Edit user"}
-              </h2>
-              <button
-                type="button"
-                className="text-sm text-gray-500 hover:text-gray-700"
-                onClick={cancelForm}
-              >
-                Close
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    Username
-                  </label>
-                  <input
-                    type="text"
-                    value={form.username}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, username: e.target.value }))
-                    }
-                    className="mt-1 w-full border rounded px-3 py-2"
-                    required
-                    disabled={editingId !== "new"}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    Full name
-                  </label>
-                  <input
-                    type="text"
-                    value={form.fullName}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, fullName: e.target.value }))
-                    }
-                    className="mt-1 w-full border rounded px-3 py-2"
-                    required
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Email</label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, email: e.target.value }))
-                  }
-                  className="mt-1 w-full border rounded px-3 py-2"
-                />
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Role</label>
-                  <select
-                    value={form.role}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, role: e.target.value }))
-                    }
-                    className="mt-1 w-full border rounded px-3 py-2"
-                  >
-                    {ROLE_OPTIONS.map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    Status
-                  </label>
-                  <select
-                    value={form.status}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, status: e.target.value }))
-                    }
-                    className="mt-1 w-full border rounded px-3 py-2"
-                  >
-                    {STATUS_OPTIONS.map((status) => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              {editingId === "new" && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    Temporary password
-                  </label>
-                  <input
-                    type="password"
-                    value={form.password}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, password: e.target.value }))
-                    }
-                    className="mt-1 w-full border rounded px-3 py-2"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Provide a strong temporary password. The user will be asked to
-                    change it on first login.
-                  </p>
-                </div>
-              )}
-              <div className="flex justify-end gap-3">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+            <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-800">
+                  {editingId === "new" ? "Create user" : "Edit user"}
+                </h2>
                 <button
                   type="button"
+                  className="text-sm text-gray-500 hover:text-gray-700"
                   onClick={cancelForm}
-                  className="px-4 py-2 border border-gray-300 rounded text-gray-600 hover:bg-gray-50"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700"
-                >
-                  Save
+                  Close
                 </button>
               </div>
-            </form>
-          </section>
+              <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      value={form.username}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, username: e.target.value }))
+                      }
+                      className="mt-1 w-full border rounded px-3 py-2"
+                      required
+                      disabled={editingId !== "new"}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">
+                      Full name
+                    </label>
+                    <input
+                      type="text"
+                      value={form.fullName}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, fullName: e.target.value }))
+                      }
+                      className="mt-1 w-full border rounded px-3 py-2"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Email</label>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, email: e.target.value }))
+                    }
+                    className="mt-1 w-full border rounded px-3 py-2"
+                  />
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Role</label>
+                    <select
+                      value={form.role}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, role: e.target.value }))
+                      }
+                      className="mt-1 w-full border rounded px-3 py-2"
+                    >
+                      {ROLE_OPTIONS.map((role) => (
+                        <option key={role.value} value={role.value}>
+                          {role.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">
+                      Status
+                    </label>
+                    <select
+                      value={form.status}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, status: e.target.value }))
+                      }
+                      className="mt-1 w-full border rounded px-3 py-2"
+                    >
+                      {STATUS_OPTIONS.map((status) => (
+                        <option key={status.value} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {editingId === "new" && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">
+                      Temporary password
+                    </label>
+                    <input
+                      type="password"
+                      value={form.password}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, password: e.target.value }))
+                      }
+                      className="mt-1 w-full border rounded px-3 py-2"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Provide a strong temporary password. The user will be asked to
+                      change it on first login.
+                    </p>
+                  </div>
+                )}
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={cancelForm}
+                    className="px-4 py-2 border border-gray-300 rounded text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
 
         {resetUserId && (
-          <section className="bg-white rounded-xl shadow p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-800">
-                Reset password
-              </h2>
-              <button
-                type="button"
-                className="text-sm text-gray-500 hover:text-gray-700"
-                onClick={() => setResetUserId(null)}
-              >
-                Close
-              </button>
-            </div>
-            <form onSubmit={handlePasswordReset} className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">
-                  New password
-                </label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="mt-1 w-full border rounded px-3 py-2"
-                  required
-                />
-                <PasswordRequirements />
-              </div>
-              <div className="flex justify-end gap-3">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Reset password
+                </h2>
                 <button
                   type="button"
+                  className="text-sm text-gray-500 hover:text-gray-700"
                   onClick={() => setResetUserId(null)}
-                  className="px-4 py-2 border border-gray-300 rounded text-gray-600 hover:bg-gray-50"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isResetting}
-                  className="px-4 py-2 bg-green-600 text-white font-semibold rounded hover:bg-green-700 disabled:opacity-60"
-                >
-                  {isResetting ? "Updating..." : "Update password"}
+                  Close
                 </button>
               </div>
-            </form>
-          </section>
+              <form onSubmit={handlePasswordReset} className="space-y-4 mt-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">
+                    New password
+                  </label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="mt-1 w-full border rounded px-3 py-2"
+                    required
+                  />
+                  <PasswordRequirements />
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setResetUserId(null)}
+                    className="px-4 py-2 border border-gray-300 rounded text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isResetting}
+                    className="px-4 py-2 bg-green-600 text-white font-semibold rounded hover:bg-green-700 disabled:opacity-60"
+                  >
+                    {isResetting ? "Updating..." : "Update password"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
       </main>
     </ProtectedRoute>

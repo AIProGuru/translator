@@ -247,116 +247,118 @@ export default function PricingTiersAdminPage() {
         </section>
 
         {editingId && (
-          <section className="bg-white rounded-xl shadow p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-800">
-                {editingId === "new" ? "Add tier" : "Edit tier"}
-              </h2>
-              <button
-                type="button"
-                className="text-sm text-gray-500 hover:text-gray-700"
-                onClick={cancelEdit}
-              >
-                Close
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Label</label>
-                  <input
-                    type="text"
-                    value={form.label}
-                    onChange={(e) => setForm((prev) => ({ ...prev, label: e.target.value }))}
-                    className="mt-1 w-full border rounded px-3 py-2"
-                    placeholder="e.g. Up to 10k"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Currency</label>
-                  <input
-                    type="text"
-                    value={form.currency}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, currency: e.target.value }))
-                    }
-                    className="mt-1 w-full border rounded px-3 py-2"
-                    maxLength={3}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Min words</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.minWords}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, minWords: e.target.value }))
-                    }
-                    className="mt-1 w-full border rounded px-3 py-2"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    Max words (optional)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.maxWords}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, maxWords: e.target.value }))
-                    }
-                    className="mt-1 w-full border rounded px-3 py-2"
-                    placeholder="Leave blank for no max"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Price per word</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.0001"
-                    value={form.pricePerWord}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, pricePerWord: e.target.value }))
-                    }
-                    className="mt-1 w-full border rounded px-3 py-2"
-                    required
-                  />
-                </div>
-              </div>
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, isActive: e.target.checked }))
-                  }
-                />
-                Active tier
-              </label>
-              <div className="flex justify-end gap-3">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+            <section className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-800">
+                  {editingId === "new" ? "Add tier" : "Edit tier"}
+                </h2>
                 <button
                   type="button"
+                  className="text-sm text-gray-500 hover:text-gray-700"
                   onClick={cancelEdit}
-                  className="px-4 py-2 border border-gray-300 rounded text-gray-600 hover:bg-gray-50"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700"
-                >
-                  Save tier
+                  Close
                 </button>
               </div>
-            </form>
-          </section>
+              <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Label</label>
+                    <input
+                      type="text"
+                      value={form.label}
+                      onChange={(e) => setForm((prev) => ({ ...prev, label: e.target.value }))}
+                      className="mt-1 w-full border rounded px-3 py-2"
+                      placeholder="e.g. Up to 10k"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Currency</label>
+                    <input
+                      type="text"
+                      value={form.currency}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, currency: e.target.value }))
+                      }
+                      className="mt-1 w-full border rounded px-3 py-2"
+                      maxLength={3}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Min words</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={form.minWords}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, minWords: e.target.value }))
+                      }
+                      className="mt-1 w-full border rounded px-3 py-2"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">
+                      Max words (optional)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={form.maxWords}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, maxWords: e.target.value }))
+                      }
+                      className="mt-1 w-full border rounded px-3 py-2"
+                      placeholder="Leave blank for no max"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Price per word</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      value={form.pricePerWord}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, pricePerWord: e.target.value }))
+                      }
+                      className="mt-1 w-full border rounded px-3 py-2"
+                      required
+                    />
+                  </div>
+                </div>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.isActive}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, isActive: e.target.checked }))
+                    }
+                  />
+                  Active tier
+                </label>
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="px-4 py-2 border border-gray-300 rounded text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700"
+                  >
+                    Save tier
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
         )}
       </main>
     </ProtectedRoute>

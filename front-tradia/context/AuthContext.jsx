@@ -125,7 +125,7 @@ export function AuthProvider({ children }) {
       isMounted = false;
       controller.abort();
     };
-  }, [token, setServerError]);
+  }, [hasHydrated, token, setServerError]);
 
   const login = async ({ username, password }) => {
     try {

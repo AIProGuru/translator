@@ -5,7 +5,7 @@ import { ServerErrorProvider } from "../context/ServerErrorContext";
 import { PromptTemplateProvider } from "../context/PromptTemplateContext";
 import GlobalModals from "../components/GlobalModals";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], display: "swap", preload: false });
 
 export const metadata = {
   title: "Amigo Translations - Legal Translations with AI",
@@ -23,7 +23,7 @@ export default function RootLayout({ children }) {
         <ServerErrorProvider>
           <AuthProvider>
             <PromptTemplateProvider>
-              <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+              <div className="min-h-screen app-shell">
                 {children}
                 <GlobalModals />
               </div>

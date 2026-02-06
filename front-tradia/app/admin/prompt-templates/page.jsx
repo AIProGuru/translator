@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/navbar";
 import { usePromptTemplates } from "../../../context/PromptTemplateContext";
@@ -15,6 +15,14 @@ const emptyForm = {
   styleText: "",
   examplesText: "",
 };
+
+const normalizeKey = (value) =>
+  value
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
 const templateToForm = (template) => ({
   id: template.id,
@@ -69,6 +77,7 @@ export default function PromptTemplateAdminPage() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [errorMessage, setErrorMessage] = useState("");
+  const editorRef = useRef(null);
 
   const startEditing = (template) => {
     setErrorMessage("");
@@ -76,12 +85,31 @@ export default function PromptTemplateAdminPage() {
     setForm(template ? templateToForm(template) : { ...emptyForm, id: "" });
   };
 
+  useEffect(() => {
+    if (editingId === null) return;
+    editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [editingId]);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!form.label.trim()) return;
     setErrorMessage("");
     try {
-      const prepared = formToTemplate(form);
+      const rawKey =
+        editingId === "new"
+          ? form.key.trim() || form.label.trim()
+          : form.key.trim();
+      const normalizedKey = rawKey ? normalizeKey(rawKey) : "";
+
+      if (editingId === "new" && !normalizedKey) {
+        setErrorMessage("Template key is required.");
+        return;
+      }
+
+      const prepared = formToTemplate({
+        ...form,
+        key: normalizedKey || form.key,
+      });
       if (editingId && editingId !== "new") {
         await updateTemplate(editingId, prepared);
       } else {
@@ -127,6 +155,13 @@ export default function PromptTemplateAdminPage() {
               type="button"
               onClick={async () => {
                 setErrorMessage("");
+                if (
+                  !window.confirm(
+                    "Restore default templates? This will overwrite any custom changes.",
+                  )
+                ) {
+                  return;
+                }
                 try {
                   await resetTemplates();
                 } catch (error) {
@@ -139,6 +174,20 @@ export default function PromptTemplateAdminPage() {
             </button>
           </div>
         </div>
+
+        {errorMessage && (
+          <div className="p-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded">
+            {errorMessage}
+          </div>
+        )}
+
+        {editingId !== null && (
+          <div className="p-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded">
+            {editingId === "new"
+              ? "Adding a new template"
+              : `Editing template #${editingId}`}
+          </div>
+        )}
 
         <section className="bg-white rounded-xl shadow p-6 space-y-4">
           <h2 className="text-xl font-semibold text-gray-800">Existing templates</h2>
@@ -182,7 +231,11 @@ export default function PromptTemplateAdminPage() {
         </section>
 
         {editingId !== null && (
-          <section className="bg-white rounded-xl shadow p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+            <section
+              ref={editorRef}
+              className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto"
+            >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-800">
                 {editingId === "new" ? "Add template" : "Edit template"}
@@ -199,11 +252,6 @@ export default function PromptTemplateAdminPage() {
               </button>
             </div>
             <form className="space-y-4" onSubmit={handleSubmit}>
-              {errorMessage && (
-                <div className="p-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded">
-                  {errorMessage}
-                </div>
-              )}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-700">Label</label>
@@ -297,6 +345,7 @@ export default function PromptTemplateAdminPage() {
               </div>
             </form>
           </section>
+          </div>
         )}
       </main>
     </ProtectedRoute>

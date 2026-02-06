@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState, useCallback, useRef } from "react";
 import ProtectedRoute from "../../../components/ProtectedRoute";
+import Navbar from "@/components/navbar";
 import { BACK_HOST } from "@/lib/constants";
 import { useSafeFetch } from "@/hooks/useSafeFetch";
 import { useAuth } from "../../../context/AuthContext";
@@ -1835,9 +1836,41 @@ export default function PreviewPage({ params }) {
 
   return (
     <ProtectedRoute>
-      <main className="container mx-auto px-4 py-8">
+      <Navbar />
+      <main className="w-full px-4 md:px-6 py-8">
+        <div className="w-full max-w-[1400px] mx-auto">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
+                Review
+              </p>
+              <h1 className="text-2xl font-semibold text-slate-900">
+                Translation preview
+              </h1>
+              <p className="text-sm text-slate-500">
+                Validate the first pages before proceeding to payment.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-slate-500">
+              <span className="px-2 py-1 rounded-full bg-white/80 border border-slate-200">
+                Upload
+              </span>
+              <span className="text-slate-300">—</span>
+              <span className="px-2 py-1 rounded-full bg-blue-600 text-white">
+                Review
+              </span>
+              <span className="text-slate-300">—</span>
+              <span className="px-2 py-1 rounded-full bg-white/80 border border-slate-200">
+                Payment
+              </span>
+              <span className="text-slate-300">—</span>
+              <span className="px-2 py-1 rounded-full bg-white/80 border border-slate-200">
+                Translation in Progress
+              </span>
+            </div>
+          </div>
         {processData?.status === "payment_pending" && (
-          <div className="mb-4 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <span>
               Preview limited to the first {previewLimit || 3} pages. Pay to
               unlock the full translation.
@@ -1845,33 +1878,10 @@ export default function PreviewPage({ params }) {
             <button
               type="button"
               onClick={() => window.location.assign(`/${processId}/payment`)}
-              className="px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+              className="px-3 py-1 rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
             >
               Go to payment
             </button>
-          </div>
-        )}
-        {previewStatus && (
-          <div className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded">
-            {previewStatus}
-          </div>
-        )}
-        {isPreviewPending && (
-          <div className="mb-4 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-blue-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="h-6 w-6 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" />
-              <div className="text-sm font-medium">
-                Translating the first {previewLimit || 3} pages for preview...
-              </div>
-            </div>
-            <div className="text-xs text-blue-700">
-              This usually takes a minute. We will refresh automatically.
-            </div>
-          </div>
-        )}
-        {message && (
-          <div className="mb-4 text-sm text-blue-700 bg-blue-50 border border-blue-200 px-3 py-2 rounded">
-            {message}
           </div>
         )}
         <DndContext
@@ -1880,8 +1890,8 @@ export default function PreviewPage({ params }) {
           onDragCancel={handleDragCancel}
         >
           <div className="flex flex-col lg:flex-row gap-4">
-            <aside className="w-full lg:w-56 flex-shrink-0 space-y-3">
-              <div className="border rounded-lg bg-white shadow-sm p-3">
+            <aside className="w-full lg:w-64 flex-shrink-0 space-y-3">
+              <div className="border rounded-2xl bg-white/90 backdrop-blur shadow-sm p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
                   Toolbox
                 </div>
@@ -3071,7 +3081,7 @@ export default function PreviewPage({ params }) {
             </div> */}
             <button
               onClick={handleDownloadMerged}
-              className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-700"
+              className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-md"
             >
               Download merged translated PDF
             </button>
@@ -3088,6 +3098,7 @@ export default function PreviewPage({ params }) {
             ) : null}
           </DragOverlay>
         </DndContext>
+        </div>
       </main>
     </ProtectedRoute>
   );

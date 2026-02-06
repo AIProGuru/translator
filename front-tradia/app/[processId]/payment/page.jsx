@@ -228,100 +228,173 @@ export default function PaymentPage({ params }) {
   return (
     <ProtectedRoute>
       <Navbar />
-      <main className="container mx-auto px-4 py-12">
-        <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-xl p-8 space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold text-blue-800">Payment</h1>
-            <p className="text-sm text-gray-600">
-              Confirm payment to start the translation process.
-            </p>
+      <main className="container mx-auto px-4 py-10">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+            <div className="inline-flex items-center gap-2 text-xs font-semibold text-blue-700 bg-blue-100/70 px-3 py-1 rounded-full">
+              <span className="h-2 w-2 rounded-full bg-blue-500" />
+              M.A.R.I.A. Payment
+            </div>
+            <div className="flex items-center gap-3 text-xs text-slate-500">
+              <span className="px-2 py-1 rounded-full bg-white/80 border border-slate-200">
+                Upload
+              </span>
+              <span className="text-slate-300">—</span>
+              <span className="px-2 py-1 rounded-full bg-white/80 border border-slate-200">
+                Review
+              </span>
+              <span className="text-slate-300">—</span>
+              <span className="px-2 py-1 rounded-full bg-blue-600 text-white">
+                Payment
+              </span>
+              <span className="text-slate-300">—</span>
+              <span className="px-2 py-1 rounded-full bg-white/80 border border-slate-200">
+                Translation in Progress
+              </span>
+            </div>
           </div>
 
-          {isLoading && <p className="text-sm text-gray-500">Loading...</p>}
-
-          {!isLoading && error && (
-            <div className="border border-red-200 bg-red-50 text-red-700 text-sm rounded px-3 py-2">
-              {error}
-            </div>
-          )}
-
-          {!isLoading && processData && (
-            <div className="space-y-4 text-sm text-gray-700">
-              <div className="flex justify-between">
-                <span>Process ID</span>
-                <span className="font-medium">{processData.id}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Word count</span>
-                <span className="font-medium">
-                  {pricingQuote?.wordCount ?? processData.config?.wordCount ?? 0}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Pricing tier</span>
-                <span className="font-medium">
-                  {pricingQuote?.tier?.label || "Not configured"}
-                </span>
-              </div>
-              <div className="flex justify-between text-base">
-                <span className="font-semibold">Total due</span>
-                <span className="font-semibold">{estimatedCostLabel}</span>
-              </div>
-              {payment?.status === "payment_confirmed" && (
-                <p className="text-sm text-green-600">
-                  Payment already confirmed. Redirecting to processing...
-                </p>
-              )}
-            </div>
-          )}
-
-          {!isLoading && (
-            <div className="space-y-4">
-              <div className="rounded border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700 flex items-center justify-between gap-2">
-                <span>Want to review the 3-page translated preview first?</span>
-                <button
-                  type="button"
-                  onClick={() => router.push(`/${processId}/preview`)}
-                  className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
-                >
-                  View preview
-                </button>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={handleStripeCheckout}
-                  disabled={isPaying || !stripePublishableKey || !pricingQuote?.tier}
-                  className="px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 disabled:opacity-60"
-                >
-                  {isPaying ? "Redirecting..." : "Pay with Stripe"}
-                </button>
-                <div className="flex flex-col items-center justify-center border rounded p-3">
-                  {!paypalClientId ? (
-                    <p className="text-xs text-gray-500">
-                      PayPal client id not configured.
-                    </p>
-                  ) : (
-                    <div id="paypal-button-container" className="w-full" />
-                  )}
+          <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] items-start">
+            <div className="bg-white/90 backdrop-blur rounded-2xl shadow-xl border border-slate-100 p-6 lg:p-8 space-y-6">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/dashboard")}
+                    className="inline-flex items-center gap-2 text-xs text-slate-500 border border-slate-200 px-3 py-1 rounded-full hover:bg-slate-50"
+                  >
+                    <span className="text-base">←</span> Back
+                  </button>
+                  <h1 className="text-3xl font-semibold text-slate-900 mt-4">
+                    Payment
+                  </h1>
+                  <p className="text-sm text-slate-500">
+                    Confirm payment to start the translation immediately.
+                  </p>
                 </div>
               </div>
-              <div className="text-xs text-gray-500">
-                {stripePublishableKey
-                  ? null
-                  : "Stripe publishable key not configured."}
+
+              {isLoading && (
+                <p className="text-sm text-slate-500">Loading...</p>
+              )}
+
+              {!isLoading && error && (
+                <div className="border border-red-200 bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3">
+                  {error}
+                </div>
+              )}
+
+              {!isLoading && processData && (
+                <div className="rounded-2xl border border-slate-100 bg-white shadow-sm p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-slate-800">
+                      Translation Summary
+                    </p>
+                    <span className="text-xs text-slate-400">
+                      #{processData.id}
+                    </span>
+                  </div>
+                  <div className="grid gap-3 text-sm text-slate-600">
+                    <div className="flex justify-between">
+                      <span>Document ID</span>
+                      <span className="font-medium text-slate-800">
+                        #{processData.id}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Pricing tier</span>
+                      <span className="font-medium text-slate-800">
+                        {pricingQuote?.tier?.label || "Not configured"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Word count</span>
+                      <span className="font-medium text-slate-800">
+                        {pricingQuote?.wordCount ?? processData.config?.wordCount ?? 0}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-700">
+                      Total due
+                    </span>
+                    <span className="text-xl font-semibold text-blue-700">
+                      {estimatedCostLabel}
+                    </span>
+                  </div>
+                  {payment?.status === "payment_confirmed" && (
+                    <p className="text-sm text-green-600">
+                      Payment already confirmed. Redirecting to processing...
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {!isLoading && (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-xs text-blue-700 flex items-center justify-between gap-3">
+                    <span>
+                      Want to review the 3-page translated preview before paying?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/${processId}/preview`)}
+                      className="px-3 py-1 rounded-full bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      View preview
+                    </button>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={handleStripeCheckout}
+                      disabled={isPaying || !stripePublishableKey || !pricingQuote?.tier}
+                      className="px-4 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-60 shadow-md"
+                    >
+                      {isPaying ? "Redirecting..." : "Pay securely with Stripe"}
+                    </button>
+                    <div className="flex flex-col items-center justify-center border border-slate-200 rounded-xl p-3 bg-white">
+                      {!paypalClientId ? (
+                        <p className="text-xs text-slate-500">
+                          PayPal client id not configured.
+                        </p>
+                      ) : (
+                        <div id="paypal-button-container" className="w-full" />
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    {stripePublishableKey
+                      ? "Secure payment • No card data stored"
+                      : "Stripe publishable key not configured."}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-slate-100 p-6 space-y-4">
+              <h2 className="text-lg font-semibold text-slate-800">
+                Why choose M.A.R.I.A.?
+              </h2>
+              <ul className="space-y-3 text-sm text-slate-600">
+                {[
+                  "Legal-grade translation quality",
+                  "Confidential document handling",
+                  "AI + human review process",
+                  "Used by professionals worldwide",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-xs">
+                      ✓
+                    </span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-500">
+                Need help? Contact support and we’ll assist with your payment.
               </div>
             </div>
-          )}
-
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => router.push("/dashboard")}
-              className="px-4 py-2 border border-gray-300 rounded text-gray-600 hover:bg-gray-50"
-            >
-              Back
-            </button>
           </div>
         </div>
       </main>
