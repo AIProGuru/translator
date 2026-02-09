@@ -21,6 +21,19 @@ export function useSafeFetch() {
   const [serverError, setServerError] = useState(false);
   const { token } = useAuth();
 
+  const readStoredToken = () => {
+    if (typeof window === "undefined") return null;
+    try {
+      return (
+        window.sessionStorage.getItem("maria_auth_token") ||
+        window.localStorage.getItem("maria_auth_token")
+      );
+    } catch (error) {
+      console.warn("Unable to read stored token:", error);
+      return null;
+    }
+  };
+
   const safeFetch = useCallback(
     async (url, options = {}) => {
       try {
@@ -34,8 +47,9 @@ export function useSafeFetch() {
           mergedOptions.credentials = "include";
         }
 
-        if (token) {
-          mergedOptions.headers["Authorization"] = `Bearer ${token}`;
+        const authToken = token || readStoredToken();
+        if (authToken) {
+          mergedOptions.headers["Authorization"] = `Bearer ${authToken}`;
         }
 
         const response = await fetch(buildUrl(url), mergedOptions);

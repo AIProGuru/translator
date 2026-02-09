@@ -7,6 +7,8 @@ export default function QuoteModal({
   onCancel,
   isAccepting,
   isCancelling,
+  onPreview,
+  isPreviewing,
 }) {
   if (!isOpen || !quote) return null;
 
@@ -65,17 +67,25 @@ export default function QuoteModal({
           )}
         </div>
 
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            onClick={onPreview}
+            disabled={!quote.processId || isAccepting || isCancelling || isPreviewing}
+            className="px-4 py-2 rounded-full border border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+          >
+            {isPreviewing ? "Opening..." : "View preview"}
+          </button>
           <button
             onClick={onCancel}
-            disabled={isCancelling || isAccepting}
+            disabled={isCancelling || isAccepting || isPreviewing}
             className="px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-60"
           >
             {isCancelling ? "Canceling..." : "Cancel"}
           </button>
           <button
             onClick={onAccept}
-            disabled={!hasTier || isAccepting || isCancelling}
+            disabled={!hasTier || isAccepting || isCancelling || isPreviewing}
             className="px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60 shadow-md"
           >
             {isAccepting ? "Starting..." : "Accept & Start"}

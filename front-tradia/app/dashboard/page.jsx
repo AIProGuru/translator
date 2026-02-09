@@ -33,6 +33,7 @@ export default function Home() {
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [isAcceptingQuote, setIsAcceptingQuote] = useState(false);
   const [isCancelingQuote, setIsCancelingQuote] = useState(false);
+  const [isPreviewingQuote, setIsPreviewingQuote] = useState(false);
   const { user, isLoading } = useAuth();
   const { safeFetch, serverError, setServerError } = useSafeFetch();
   const { templates } = usePromptTemplates();
@@ -189,6 +190,49 @@ export default function Home() {
     }
   };
 
+  const handlePreviewQuote = async () => {
+    if (!quoteData?.processId) return;
+    setIsPreviewingQuote(true);
+    try {
+      const processResponse = await safeFetch(
+        `${BACK_HOST}/api/processes/${quoteData.processId}`,
+        {
+          method: "GET",
+          credentials: "include",
+        },
+      );
+
+      if (!processResponse || !processResponse.ok) {
+        setServerError(true);
+        return;
+      }
+
+      const process = await processResponse.json();
+      const status = process?.status;
+
+      if (status === "awaiting_acceptance") {
+        const acceptResponse = await safeFetch(
+          `${BACK_HOST}/api/processes/${quoteData.processId}/accept`,
+          {
+            method: "POST",
+            credentials: "include",
+          },
+        );
+        if (!acceptResponse || !acceptResponse.ok) {
+          setServerError(true);
+          return;
+        }
+      }
+
+      router.push(`/${quoteData.processId}/preview`);
+    } catch (error) {
+      console.error("Error opening preview:", error);
+      setServerError(true);
+    } finally {
+      setIsPreviewingQuote(false);
+    }
+  };
+
     return (
         <>
         <ProtectedRoute>
@@ -329,6 +373,8 @@ export default function Home() {
               onCancel={handleCancelQuote}
               isAccepting={isAcceptingQuote}
               isCancelling={isCancelingQuote}
+              onPreview={handlePreviewQuote}
+              isPreviewing={isPreviewingQuote}
             />
         </ProtectedRoute>
         </>

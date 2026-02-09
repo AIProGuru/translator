@@ -114,12 +114,23 @@ export default function PreviewPage({ params }) {
   const { processId } = use(params);
   const { token } = useAuth();
   const { safeFetch } = useSafeFetch();
+  const preloadedOriginalRef = useRef(new Map());
 
   const originalPdfUrl = token
     ? `${BACK_HOST}/api/preview/original/${processId}?token=${encodeURIComponent(
         token,
       )}`
     : `${BACK_HOST}/api/preview/original/${processId}`;
+
+  const getOriginalImageUrl = useCallback(
+    (page) =>
+      token
+        ? `${BACK_HOST}/api/preview/original-image/${processId}/${page}?token=${encodeURIComponent(
+            token,
+          )}`
+        : `${BACK_HOST}/api/preview/original-image/${processId}/${page}`,
+    [processId, token],
+  );
 
   // Use the standard translated preview (with dotted placeholders) for on-screen viewing,
   // but a "clean" version (without dotted placeholders) as the base for the merged download.
@@ -335,16 +346,49 @@ export default function PreviewPage({ params }) {
   ]);
   useEffect(() => {
     // Auto-load current page image for cropping on mount or when page changes
-    const imgUrl = token
-      ? `${BACK_HOST}/api/preview/original-image/${processId}/${currentPage}?token=${encodeURIComponent(
-          token,
-        )}`
-      : `${BACK_HOST}/api/preview/original-image/${processId}/${currentPage}`;
+    const imgUrl = getOriginalImageUrl(currentPage);
     setCropImageUrl(imgUrl);
     setMessage(
       `Original page ${currentPage} image loaded. Drag on the left page to select an area.`,
     );
-  }, [processId, token, currentPage]);
+  }, [getOriginalImageUrl, currentPage]);
+
+  const preloadOriginalPage = useCallback(
+    (page) => {
+      if (!page || page < 1 || !processId) return;
+      const key = `${token || "public"}:${page}`;
+      if (preloadedOriginalRef.current.has(key)) return;
+      const img = new Image();
+      preloadedOriginalRef.current.set(key, {
+        img,
+        status: "loading",
+        page,
+      });
+      img.onload = () => {
+        const entry = preloadedOriginalRef.current.get(key);
+        if (entry) entry.status = "loaded";
+      };
+      img.onerror = () => {
+        preloadedOriginalRef.current.delete(key);
+      };
+      img.src = getOriginalImageUrl(page);
+    },
+    [getOriginalImageUrl, processId, token],
+  );
+
+  useEffect(() => {
+    preloadedOriginalRef.current.clear();
+  }, [processId, token]);
+
+  useEffect(() => {
+    // Preload current + adjacent pages for faster navigation.
+    preloadOriginalPage(currentPage);
+    preloadOriginalPage(currentPage + 1);
+    preloadOriginalPage(currentPage + 2);
+    if (currentPage > 1) {
+      preloadOriginalPage(currentPage - 1);
+    }
+  }, [currentPage, preloadOriginalPage]);
 
   useEffect(() => {
     if (!processId) return;
@@ -389,6 +433,16 @@ export default function PreviewPage({ params }) {
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, [processId, safeFetch]);
+
+  useEffect(() => {
+    if (!processId) return;
+    const maxPrefetch = 6;
+    const limit = previewLimit || 3;
+    const pagesToPrefetch = Math.min(limit, maxPrefetch);
+    for (let page = 1; page <= pagesToPrefetch; page += 1) {
+      preloadOriginalPage(page);
+    }
+  }, [processId, previewLimit, preloadOriginalPage]);
 
   // Load translated PDF once for client-side page rendering
   useEffect(() => {

@@ -21,7 +21,9 @@ const AuthContext = createContext({
 const readStoredToken = () => {
   if (typeof window === "undefined") return null;
   try {
-    return window.sessionStorage.getItem(STORAGE_KEYS.token);
+    const sessionToken = window.sessionStorage.getItem(STORAGE_KEYS.token);
+    if (sessionToken) return sessionToken;
+    return window.localStorage.getItem(STORAGE_KEYS.token);
   } catch (error) {
     console.warn("Unable to read stored token:", error);
     return null;
@@ -31,7 +33,9 @@ const readStoredToken = () => {
 const readStoredUser = () => {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEYS.user);
+    const raw =
+      window.sessionStorage.getItem(STORAGE_KEYS.user) ||
+      window.localStorage.getItem(STORAGE_KEYS.user);
     return raw ? JSON.parse(raw) : null;
   } catch (error) {
     console.warn("Unable to parse stored user:", error);
@@ -43,18 +47,23 @@ const persistUser = (value) => {
   if (typeof window === "undefined") return;
   if (!value) {
     window.sessionStorage.removeItem(STORAGE_KEYS.user);
+    window.localStorage.removeItem(STORAGE_KEYS.user);
     return;
   }
-  window.sessionStorage.setItem(STORAGE_KEYS.user, JSON.stringify(value));
+  const serialized = JSON.stringify(value);
+  window.sessionStorage.setItem(STORAGE_KEYS.user, serialized);
+  window.localStorage.setItem(STORAGE_KEYS.user, serialized);
 };
 
 const persistToken = (value) => {
   if (typeof window === "undefined") return;
   if (!value) {
     window.sessionStorage.removeItem(STORAGE_KEYS.token);
+    window.localStorage.removeItem(STORAGE_KEYS.token);
     return;
   }
   window.sessionStorage.setItem(STORAGE_KEYS.token, value);
+  window.localStorage.setItem(STORAGE_KEYS.token, value);
 };
 
 export function AuthProvider({ children }) {
@@ -148,6 +157,7 @@ export function AuthProvider({ children }) {
       setToken(data.token);
       persistUser(data.user);
       persistToken(data.token);
+      setIsLoading(false);
       setServerError(false);
       return data;
     } catch (error) {
@@ -155,6 +165,7 @@ export function AuthProvider({ children }) {
       setToken(null);
       persistUser(null);
       persistToken(null);
+      setIsLoading(false);
       throw error;
     }
   };
@@ -180,6 +191,7 @@ export function AuthProvider({ children }) {
     setToken(data.token);
     persistUser(data.user);
     persistToken(data.token);
+    setIsLoading(false);
     return data.user;
   };
 
