@@ -543,12 +543,16 @@ class TranslationHandler {
 			templatePrompt,
 			userPrompt,
 		);
+		const terminologyPrompt = this._buildTerminologyPrompt(documentType);
+		const finalPrompt = terminologyPrompt
+			? `${mergedPrompt}\n\n${terminologyPrompt}`
+			: mergedPrompt;
 
 		return {
 			adapter,
 			language,
 			cycles,
-			prompt: mergedPrompt,
+			prompt: finalPrompt,
 			userPrompt,
 			templatePrompt,
 			documentType,
@@ -617,6 +621,71 @@ class TranslationHandler {
 			return `${base}\n\n---\nAdditional user instructions:\n${custom}`;
 		}
 		return custom || base || "Translate the document faithfully.";
+	}
+
+	_buildTerminologyPrompt(documentType = {}) {
+		const glossary = Array.isArray(documentType.glossary)
+			? documentType.glossary
+			: [];
+		const styleGuidance = Array.isArray(documentType.styleGuidance)
+			? documentType.styleGuidance
+			: [];
+		const examples = Array.isArray(documentType.examples)
+			? documentType.examples
+			: [];
+
+		const glossaryLines = glossary
+			.map((entry) => {
+				const source = entry?.source?.trim();
+				const target = entry?.target?.trim();
+				return source && target ? `${source} => ${target}` : null;
+			})
+			.filter(Boolean);
+
+		const styleLines = styleGuidance
+			.map((line) => (typeof line === "string" ? line.trim() : ""))
+			.filter(Boolean);
+
+		const exampleLines = examples
+			.map((ex) => {
+				const source = ex?.source?.trim();
+				const translation = ex?.translation?.trim();
+				return source && translation ? `${source} => ${translation}` : null;
+			})
+			.filter(Boolean);
+
+		if (!glossaryLines.length && !styleLines.length && !exampleLines.length) {
+			return "";
+		}
+
+		const blocks = [];
+		if (glossaryLines.length) {
+			blocks.push(
+				[
+					"STRICT GLOSSARY (MANDATORY):",
+					"Use the exact target terms provided. Do not paraphrase or change them.",
+					...glossaryLines.map((line) => `- ${line}`),
+				].join("\n"),
+			);
+		}
+		if (styleLines.length) {
+			blocks.push(
+				[
+					"STYLE GUIDANCE:",
+					...styleLines.map((line) => `- ${line}`),
+				].join("\n"),
+			);
+		}
+		if (exampleLines.length) {
+			blocks.push(
+				[
+					"REFERENCE EXAMPLES (PREFERRED OUTPUT):",
+					...exampleLines.map((line) => `- ${line}`),
+				].join("\n"),
+			);
+		}
+
+		return blocks.join("\n\n");
 	}
 
 	_toInteger(...values) {

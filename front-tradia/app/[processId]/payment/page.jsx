@@ -260,7 +260,18 @@ export default function PaymentPage({ params }) {
                 <div>
                   <button
                     type="button"
-                    onClick={() => router.push("/dashboard")}
+                    onClick={() => {
+                      const returnTo = searchParams.get("return");
+                      if (returnTo === "preview") {
+                        router.push(`/${processId}/preview`);
+                        return;
+                      }
+                      if (processData?.status === "payment_pending") {
+                        router.push(`/${processId}/preview`);
+                        return;
+                      }
+                      router.push("/dashboard");
+                    }}
                     className="inline-flex items-center gap-2 text-xs text-slate-500 border border-slate-200 px-3 py-1 rounded-full hover:bg-slate-50"
                   >
                     <span className="text-base">←</span> Back

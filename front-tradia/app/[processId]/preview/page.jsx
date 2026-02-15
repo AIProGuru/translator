@@ -152,6 +152,10 @@ export default function PreviewPage({ params }) {
   const [previewLimit, setPreviewLimit] = useState(null);
   const [previewPageCount, setPreviewPageCount] = useState(null);
   const [previewReady, setPreviewReady] = useState(false);
+  const [upgradeModal, setUpgradeModal] = useState({
+    open: false,
+    toolLabel: "",
+  });
   const [cropImageUrl, setCropImageUrl] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [crop, setCrop] = useState({
@@ -191,6 +195,13 @@ export default function PreviewPage({ params }) {
   const [translatedPdfDoc, setTranslatedPdfDoc] = useState(null);
   const [translatedPage, setTranslatedPage] = useState(1);
   const [translatedNumPages, setTranslatedNumPages] = useState(1);
+  const [toolUsage, setToolUsage] = useState({
+    patch: false,
+    eraser: false,
+    selection: false,
+    text: false,
+    table: false,
+  });
   const [history, setHistory] = useState(() => ({
     stack: [
       {
@@ -293,6 +304,29 @@ export default function PreviewPage({ params }) {
 
   const canUndo = history.pointer > 0;
   const canRedo = history.pointer < history.stack.length - 1;
+  const isPreviewMode = processData?.status === "payment_pending";
+  const markToolUsed = useCallback((toolKey) => {
+    setToolUsage((prev) =>
+      prev[toolKey] ? prev : { ...prev, [toolKey]: true },
+    );
+  }, []);
+  const openUpgradeModal = useCallback(
+    (toolLabel) => {
+      if (!isPreviewMode) return false;
+      setUpgradeModal({ open: true, toolLabel });
+      return true;
+    },
+    [isPreviewMode],
+  );
+  const blockToolReuse = useCallback(
+    (toolKey, toolLabel) => {
+      if (!isPreviewMode) return false;
+      if (!toolUsage[toolKey]) return false;
+      openUpgradeModal(toolLabel);
+      return true;
+    },
+    [isPreviewMode, toolUsage, openUpgradeModal],
+  );
   const handleUndo = useCallback(() => {
     setHistory((prev) => {
       if (prev.pointer <= 0) return prev;
@@ -549,6 +583,7 @@ export default function PreviewPage({ params }) {
   const [removePatchBackground, setRemovePatchBackground] = useState(false);
 
   const createPatchFromCrop = useCallback(async () => {
+    if (blockToolReuse("patch", "Patch tool")) return;
     if (!cropImageUrl || !completedCrop || !originalImgRef.current) return;
     try {
       const image = originalImgRef.current;
@@ -616,6 +651,9 @@ export default function PreviewPage({ params }) {
       };
 
       setPatches((prev) => [...prev, newPatch]);
+      if (isPreviewMode) {
+        markToolUsed("patch");
+      }
       setMessage("Patch created from original PDF.");
       setCompletedCrop(null);
       setIsCropMode(false);
@@ -624,12 +662,15 @@ export default function PreviewPage({ params }) {
       setMessage("Error creating patch from crop. Check console for details.");
     }
   }, [
+    blockToolReuse,
     cropImageUrl,
     completedCrop,
     currentPage,
+    isPreviewMode,
     patches.length,
     removePatchBackground,
     setIsCropMode,
+    markToolUsed,
   ]);
 
   const TranslatedDropArea = () => {
@@ -897,6 +938,17 @@ export default function PreviewPage({ params }) {
     // Eraser mode: start freehand drawing on the overlay
     if (isErasing) {
       event.preventDefault();
+      if (blockToolReuse("eraser", "Eraser tool")) {
+        setIsErasing(false);
+        if (eraserCursorRef.current) {
+          eraserCursorRef.current.style.left = "-9999px";
+          eraserCursorRef.current.style.top = "-9999px";
+        }
+        return;
+      }
+      if (isPreviewMode) {
+        markToolUsed("eraser");
+      }
       eraseDragRef.current = true;
 
       const overlayRect = translatedOverlayRef.current.getBoundingClientRect();
@@ -1209,6 +1261,13 @@ export default function PreviewPage({ params }) {
       requestHistorySnapshot("eraser", true);
       pendingEraserStrokeRef.current = false;
     }
+    if (isPreviewMode && toolUsage.eraser && isErasing) {
+      setIsErasing(false);
+      if (eraserCursorRef.current) {
+        eraserCursorRef.current.style.left = "-9999px";
+        eraserCursorRef.current.style.top = "-9999px";
+      }
+    }
     if (wasSelectionDrag && selectionRect) {
       setMessage("Selection adjusted. Choose an action or convert it.");
     }
@@ -1334,16 +1393,28 @@ export default function PreviewPage({ params }) {
   );
 
   const handleMoveSelection = useCallback(async () => {
+    if (blockToolReuse("selection", "Selection tool")) return;
     const patch = await captureSelectionToPatch(true);
     if (patch) {
       setIsSelectionMode(false);
       setMessage(
         "Selection moved into a draggable patch. Selection tool turned off so you can adjust it.",
       );
+      if (isPreviewMode) {
+        markToolUsed("selection");
+      }
     }
-  }, [captureSelectionToPatch, setIsSelectionMode, setMessage]);
+  }, [
+    blockToolReuse,
+    captureSelectionToPatch,
+    isPreviewMode,
+    markToolUsed,
+    setIsSelectionMode,
+    setMessage,
+  ]);
 
   const handleDeleteSelection = useCallback(() => {
+    if (blockToolReuse("selection", "Selection tool")) return;
     if (!selectionRect) return;
     const { left, top, width, height, page } = selectionRect;
     if (width < MIN_SELECTION_SIZE || height < MIN_SELECTION_SIZE) {
@@ -1374,13 +1445,21 @@ export default function PreviewPage({ params }) {
     selectionStartRef.current = null;
     setMessage("Selected area deleted.");
     requestHistorySnapshot("selection-delete");
+    if (isPreviewMode) {
+      markToolUsed("selection");
+      setIsSelectionMode(false);
+    }
   }, [
+    blockToolReuse,
+    isPreviewMode,
     selectionRect,
     eraserColor,
     MIN_SELECTION_SIZE,
     setEraseRegions,
     setMessage,
     requestHistorySnapshot,
+    markToolUsed,
+    setIsSelectionMode,
   ]);
 
   const handleCancelSelection = useCallback(() => {
@@ -1544,6 +1623,7 @@ export default function PreviewPage({ params }) {
   );
 
   const handleAddTextBox = useCallback(() => {
+    if (blockToolReuse("text", "Text tool")) return;
     const timestamp = Date.now();
     const newBox = {
       id: `text-${timestamp}-${Math.random().toString(36).slice(2, 6)}`,
@@ -1564,7 +1644,12 @@ export default function PreviewPage({ params }) {
     setActiveTableId(null);
     setMessage("Text box added. Drag or resize it on the translated page.");
     requestHistorySnapshot("text-add");
+    if (isPreviewMode) {
+      markToolUsed("text");
+    }
   }, [
+    blockToolReuse,
+    isPreviewMode,
     translatedPage,
     setTextBoxes,
     setActiveTextBoxId,
@@ -1572,6 +1657,7 @@ export default function PreviewPage({ params }) {
     setActiveTableId,
     setMessage,
     requestHistorySnapshot,
+    markToolUsed,
   ]);
 
   const updateTextBox = useCallback((id, updater) => {
@@ -1588,6 +1674,7 @@ export default function PreviewPage({ params }) {
   }, [setTextBoxes, requestHistorySnapshot]);
 
   const handleAddTable = useCallback(() => {
+    if (blockToolReuse("table", "Table tool")) return;
     const timestamp = Date.now();
     const newTable = {
       id: `table-${timestamp}-${Math.random().toString(36).slice(2, 6)}`,
@@ -1609,7 +1696,12 @@ export default function PreviewPage({ params }) {
     setActiveTextBoxId(null);
     setMessage("Table added. Drag or resize it on the translated page.");
     requestHistorySnapshot("table-add");
+    if (isPreviewMode) {
+      markToolUsed("table");
+    }
   }, [
+    blockToolReuse,
+    isPreviewMode,
     translatedPage,
     setTables,
     setActiveTableId,
@@ -1617,6 +1709,7 @@ export default function PreviewPage({ params }) {
     setActiveTextBoxId,
     setMessage,
     requestHistorySnapshot,
+    markToolUsed,
   ]);
 
   const updateTable = useCallback((id, updater) => {
@@ -1943,7 +2036,9 @@ export default function PreviewPage({ params }) {
             </span>
             <button
               type="button"
-              onClick={() => window.location.assign(`/${processId}/payment`)}
+              onClick={() =>
+                window.location.assign(`/${processId}/payment?return=preview`)
+              }
               className="px-3 py-1 rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
             >
               Go to payment
@@ -1979,6 +2074,7 @@ export default function PreviewPage({ params }) {
                     label={isCropMode ? "Exit crop mode" : "Create patch area"}
                     active={isCropMode}
                     onClick={() => {
+                      if (blockToolReuse("patch", "Patch tool")) return;
                       setIsErasing(false);
                       setIsSelectionMode(false);
                       setIsColorPickMode(false);
@@ -1989,13 +2085,17 @@ export default function PreviewPage({ params }) {
                     icon={PlusSquare}
                     label="Add patch to palette"
                     disabled={!canCreatePatchNow}
-                    onClick={createPatchFromCrop}
+                    onClick={() => {
+                      if (blockToolReuse("patch", "Patch tool")) return;
+                      createPatchFromCrop();
+                    }}
                   />
                   <IconButton
                     icon={EraserIcon}
                     label={isErasing ? "Disable eraser" : "Eraser"}
                     active={isErasing}
                     onClick={() => {
+                      if (blockToolReuse("eraser", "Eraser tool")) return;
                       setIsErasing((prev) => {
                         const next = !prev;
                         if (next) {
@@ -2041,6 +2141,7 @@ export default function PreviewPage({ params }) {
                     label={isSelectionMode ? "Exit selection" : "Selection tool"}
                     active={isSelectionMode}
                     onClick={() => {
+                      if (blockToolReuse("selection", "Selection tool")) return;
                       setIsSelectionMode((prev) => {
                         const next = !prev;
                         if (next) {
@@ -2058,6 +2159,7 @@ export default function PreviewPage({ params }) {
                     icon={TypeIcon}
                     label="Add text box"
                     onClick={() => {
+                      if (blockToolReuse("text", "Text tool")) return;
                       setIsCropMode(false);
                       setIsSelectionMode(false);
                       setIsErasing(false);
@@ -2069,6 +2171,7 @@ export default function PreviewPage({ params }) {
                     icon={TableIcon}
                     label="Insert table"
                     onClick={() => {
+                      if (blockToolReuse("table", "Table tool")) return;
                       setIsCropMode(false);
                       setIsSelectionMode(false);
                       setIsErasing(false);
@@ -3163,6 +3266,39 @@ export default function PreviewPage({ params }) {
             ) : null}
           </DragOverlay>
         </DndContext>
+        {upgradeModal.open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Preview limit reached
+              </h3>
+              <p className="mt-2 text-sm text-slate-600">
+                You have already used the {upgradeModal.toolLabel}. To use it
+                again, proceed to full translation.
+              </p>
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  className="px-3 py-1.5 rounded-full border border-slate-300 text-slate-700 hover:bg-slate-50"
+                  onClick={() =>
+                    setUpgradeModal({ open: false, toolLabel: "" })
+                  }
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1.5 rounded-full bg-blue-600 text-white hover:bg-blue-700"
+                  onClick={() =>
+                    window.location.assign(`/${processId}/payment?return=preview`)
+                  }
+                >
+                  Go to payment
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         </div>
       </main>
     </ProtectedRoute>
