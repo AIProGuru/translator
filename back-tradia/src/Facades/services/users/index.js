@@ -23,6 +23,7 @@ const ROLE_LABELS = {
   translator: "Translator",
   supervisor: "Supervisor",
   auditor: "Auditor",
+  internal: "Internal",
 };
 
 function sanitizeUsername(username = "") {

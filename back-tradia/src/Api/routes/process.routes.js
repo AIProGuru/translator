@@ -2,6 +2,7 @@ const express = require("express");
 const ProcessFacade = require("../../Facades/services/process");
 const requireAuth = require("../../Facades/middleware/requireAuth");
 const DocumentProcessingFacade = require("../../Facades/services/documents");
+const paymentService = require("../../Facades/services/payments");
 const {
 	PROCESS_STATUS,
 	FRONT_HOST,
@@ -75,6 +76,7 @@ router.delete("/processes/:id", requireAuth, async (req, res) => {
 router.post("/processes/:id/accept", requireAuth, async (req, res) => {
 	try {
 		const userId = req.user.id;
+		const userRole = req.user?.role;
 		const processId = req.params.id;
 		const process = await processFacade.getProcessById(processId, userId);
 
@@ -100,6 +102,7 @@ router.post("/processes/:id/accept", requireAuth, async (req, res) => {
 		};
 
 		const pricingQuote = config.pricingQuote || {};
+		const isInternalUser = userRole === "internal";
 		const payment = {
 			status: PROCESS_STATUS.PAYMENT_PENDING,
 			requiredAmount: pricingQuote.totalCost ?? null,
@@ -119,6 +122,12 @@ router.post("/processes/:id/accept", requireAuth, async (req, res) => {
 			},
 			userId,
 		);
+
+		if (isInternalUser) {
+			const refreshed = await processFacade.getProcessById(processId, userId);
+			await paymentService.startTranslation(refreshed, userId);
+			return res.json({ message: "Translation started." });
+		}
 
 		setImmediate(async () => {
 			try {

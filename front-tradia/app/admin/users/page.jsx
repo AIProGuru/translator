@@ -10,6 +10,7 @@ const ROLE_OPTIONS = [
   { value: "supervisor", label: "Supervisor" },
   { value: "translator", label: "Translator" },
   { value: "auditor", label: "Auditor" },
+  { value: "internal", label: "Internal" },
 ];
 
 const STATUS_OPTIONS = [

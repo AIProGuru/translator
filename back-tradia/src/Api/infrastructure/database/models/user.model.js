@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../connections/sequelize.connection").getInstance().getConnection();
 
-const USER_ROLES = ["administrator", "translator", "supervisor", "auditor"];
+const USER_ROLES = ["administrator", "translator", "supervisor", "auditor", "internal"];
 const USER_STATUS = ["active", "disabled"];
 
 const User = sequelize.define(
