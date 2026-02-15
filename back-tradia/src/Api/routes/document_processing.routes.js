@@ -12,7 +12,11 @@ const PromptTemplateService = require("../../Facades/services/promptTemplates");
 const PricingTierService = require("../../Facades/services/pricingTiers");
 
 const pdfParse = require("pdf-parse");
-const { LIMITS_PAGES, PROCESS_STATUS } = require("../shared/config/constants");
+const {
+	LIMITS_PAGES,
+	PROCESS_STATUS,
+	PREVIEW_PAGE_LIMIT,
+} = require("../shared/config/constants");
 
 const router = express.Router();
 const facade = new DocumentProcessingFacade();
@@ -436,10 +440,28 @@ router.get("/preview/translated/:id", requireAuth, async (req, res) => {
 		const isPaymentPending =
 			process?.dataValues?.status === PROCESS_STATUS.PAYMENT_PENDING;
 		const previewConfig = process?.dataValues?.config?.preview || {};
+		const wantsUnlimitedPreview =
+			!(Number.isFinite(PREVIEW_PAGE_LIMIT) && PREVIEW_PAGE_LIMIT > 0);
+		const previewWasLimited =
+			Number.isFinite(previewConfig?.maxPages) && previewConfig.maxPages > 0;
 		let output_html = process?.dataValues?.html;
 		let pagesInfo = process?.dataValues?.pages_info || [];
 
 		if (isPaymentPending) {
+			if (wantsUnlimitedPreview && previewWasLimited) {
+				setImmediate(async () => {
+					try {
+						await facade.generatePreviewTranslation({
+							processId,
+							userId,
+							maxPages: null,
+						});
+					} catch (previewError) {
+						console.error("Error regenerating full preview:", previewError);
+					}
+				});
+				return res.status(409).json({ error: "Preview refreshing." });
+			}
 			if (!previewConfig?.html) {
 				return res.status(409).json({ error: "Preview not ready." });
 			}
@@ -488,10 +510,28 @@ router.get(
 			const isPaymentPending =
 				process?.dataValues?.status === PROCESS_STATUS.PAYMENT_PENDING;
 			const previewConfig = process?.dataValues?.config?.preview || {};
+			const wantsUnlimitedPreview =
+				!(Number.isFinite(PREVIEW_PAGE_LIMIT) && PREVIEW_PAGE_LIMIT > 0);
+			const previewWasLimited =
+				Number.isFinite(previewConfig?.maxPages) && previewConfig.maxPages > 0;
 			let output_html = process?.dataValues?.html;
 			let pagesInfo = process?.dataValues?.pages_info || [];
 
 			if (isPaymentPending) {
+				if (wantsUnlimitedPreview && previewWasLimited) {
+					setImmediate(async () => {
+						try {
+							await facade.generatePreviewTranslation({
+								processId,
+								userId,
+								maxPages: null,
+							});
+						} catch (previewError) {
+							console.error("Error regenerating full preview:", previewError);
+						}
+					});
+					return res.status(409).json({ error: "Preview refreshing." });
+				}
 				if (!previewConfig?.html) {
 					return res.status(409).json({ error: "Preview not ready." });
 				}

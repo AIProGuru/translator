@@ -122,10 +122,14 @@ router.post("/processes/:id/accept", requireAuth, async (req, res) => {
 
 		setImmediate(async () => {
 			try {
+				const previewMaxPages =
+					Number.isFinite(PREVIEW_PAGE_LIMIT) && PREVIEW_PAGE_LIMIT > 0
+						? PREVIEW_PAGE_LIMIT
+						: null;
 				await documentFacade.generatePreviewTranslation({
 					processId,
 					userId,
-					maxPages: PREVIEW_PAGE_LIMIT,
+					maxPages: previewMaxPages,
 				});
 			} catch (previewError) {
 				console.error("Error generating preview translation:", previewError);

@@ -86,6 +86,10 @@ class DocumentProcessingFacade {
 
 		const config = process.config || {};
 		const previewConfig = config.preview || {};
+		const wantsUnlimited =
+			!(Number.isFinite(maxPages) && maxPages > 0);
+		const previewWasLimited =
+			Number.isFinite(previewConfig.maxPages) && previewConfig.maxPages > 0;
 		if (previewConfig.html && previewConfig.pages_info?.length) {
 			const targetLanguage = config.translation?.language || "spanish";
 			const previewLooksOk =
@@ -93,7 +97,7 @@ class DocumentProcessingFacade {
 					previewConfig.html,
 					targetLanguage,
 				);
-			if (previewLooksOk) {
+			if (previewLooksOk && !(wantsUnlimited && previewWasLimited)) {
 				return { skipped: true, reason: "preview_exists" };
 			}
 		}
@@ -141,9 +145,7 @@ class DocumentProcessingFacade {
 				pages_info: preview.pages_info,
 				pages: preview.previewPageCount,
 				maxPages:
-					Number.isFinite(maxPages) && maxPages > 0
-						? maxPages
-						: preview.previewPageCount,
+					Number.isFinite(maxPages) && maxPages > 0 ? maxPages : null,
 				generatedAt: new Date().toISOString(),
 			},
 		};

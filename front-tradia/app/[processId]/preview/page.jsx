@@ -150,6 +150,7 @@ export default function PreviewPage({ params }) {
   const [previewStatus, setPreviewStatus] = useState("");
   const [processData, setProcessData] = useState(null);
   const [previewLimit, setPreviewLimit] = useState(null);
+  const [previewPageCount, setPreviewPageCount] = useState(null);
   const [previewReady, setPreviewReady] = useState(false);
   const [cropImageUrl, setCropImageUrl] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -406,8 +407,13 @@ export default function PreviewPage({ params }) {
         if (cancelled) return;
         setProcessData(data);
         const preview = data?.config?.preview || {};
-        const limit = preview.maxPages || preview.pages || null;
+        const limit =
+          Number.isFinite(preview.maxPages) && preview.maxPages > 0
+            ? preview.maxPages
+            : null;
+        const pageCount = Number.isFinite(preview.pages) ? preview.pages : null;
         setPreviewLimit(limit);
+        setPreviewPageCount(pageCount);
 
         const status = data?.status;
         const previewAvailable = Boolean(preview?.html);
@@ -437,7 +443,8 @@ export default function PreviewPage({ params }) {
   useEffect(() => {
     if (!processId) return;
     const maxPrefetch = 6;
-    const limit = previewLimit || 3;
+    const limit =
+      Number.isFinite(previewLimit) && previewLimit > 0 ? previewLimit : 3;
     const pagesToPrefetch = Math.min(limit, maxPrefetch);
     for (let page = 1; page <= pagesToPrefetch; page += 1) {
       preloadOriginalPage(page);
@@ -1887,6 +1894,11 @@ export default function PreviewPage({ params }) {
     completedCrop.height >= 5;
   const isPreviewPending =
     processData?.status === "payment_pending" && !previewReady;
+  const previewProgressText = previewLimit
+    ? `the first ${previewLimit} pages`
+    : previewPageCount
+      ? `all ${previewPageCount} pages`
+      : "all pages";
 
   return (
     <ProtectedRoute>
@@ -1923,10 +1935,10 @@ export default function PreviewPage({ params }) {
               </span>
             </div>
           </div>
-        {processData?.status === "payment_pending" && (
+        {processData?.status === "payment_pending" && previewLimit && (
           <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <span>
-              Preview limited to the first {previewLimit || 3} pages. Pay to
+              Preview limited to the first {previewLimit} pages. Pay to
               unlock the full translation.
             </span>
             <button
@@ -2498,8 +2510,7 @@ export default function PreviewPage({ params }) {
                           Translating preview pages...
                         </div>
                         <div className="text-xs text-blue-700">
-                          Please wait while we prepare the first{" "}
-                          {previewLimit || 3} pages.
+                          Please wait while we prepare {previewProgressText}.
                         </div>
                       </div>
                     </div>
