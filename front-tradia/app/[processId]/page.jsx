@@ -15,7 +15,8 @@ export default function ProcessPage({ params }) {
   const { processId } = use(params);
   const [isDownloading, setIsDownloading] = useState(false);
   const [selected, setSelected] = useState("pdf");
-  const { status, messages, last_message } = useProcessStatus(processId);
+  const { status, messages, last_message, progress: liveProgress } =
+    useProcessStatus(processId);
   const [showServerErrorModal, setShowServerErrorModal] = useState(false);
   const { safeFetch } = useSafeFetch();
   const [estimatedTime, setEstimatedTime] = useState(0);
@@ -39,9 +40,12 @@ export default function ProcessPage({ params }) {
   }, []);
 
   const progress = useMemo(() => {
+    if (Number.isFinite(liveProgress) && liveProgress > 0) {
+      return liveProgress.toFixed(2);
+    }
     if (!estimatedTime) return 0;
     return Math.min((elapsed / estimatedTime) * 100, 95).toFixed(2);
-  }, [elapsed, estimatedTime]);
+  }, [elapsed, estimatedTime, liveProgress]);
 
   const handleDownload = async () => {
     try {

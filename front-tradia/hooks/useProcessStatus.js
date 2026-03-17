@@ -35,16 +35,33 @@ export const useProcessStatus = (processId) => {
                 const data = JSON.parse(event.data);
                 setLastMessage(data.message)
                 setMessages((prev) => [...prev, data.message]);
+
+                if (typeof data.progress === "number" && Number.isFinite(data.progress)) {
+                    setProgress(Math.max(0, Math.min(100, data.progress)));
+                } else if (typeof data.message === "string") {
+                    const match = data.message.match(/Translate\s+(\d+)\s*\/\s*(\d+)/i);
+                    if (match) {
+                        const done = Number.parseInt(match[1], 10);
+                        const total = Number.parseInt(match[2], 10);
+                        if (Number.isFinite(done) && Number.isFinite(total) && total > 0) {
+                            const percent = Math.round((done / total) * 100);
+                            setProgress(Math.max(0, Math.min(100, percent)));
+                        }
+                    }
+                }
                 switch (data.status) {
                     case "completed":
                         setStatus("completed");
+                        setProgress(100);
                         eventSource.close();
                         break;
                     case "pending":
                         setStatus("pending");
-                        if (data.message) {
-                            setProgress(Math.min(95, (messages.length + 1) * 5));
-                        }
+                        break;
+                    case "processing":
+                    case "translating":
+                    case "upload":
+                        setStatus("pending");
                         break;
                     case "awaiting_acceptance":
                         setStatus("awaiting_acceptance");
@@ -60,6 +77,7 @@ export const useProcessStatus = (processId) => {
                         eventSource.close();
                         break;
                     case "cancelled":
+                    case "canceled":
                         setStatus("cancelled");
                         eventSource.close();
                         break;
