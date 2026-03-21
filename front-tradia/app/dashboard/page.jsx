@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import UploadArea from "@/components/upload-area";
 import LanguageSelector from "@/components/language-selector";
 import AdvancedSettings from "@/components/advanced-settings";
-import ProcessList from "@/components/process-list";
 import { FRONT_HOST, BACK_HOST } from "@/lib/constants";
 import ESTIMATED_TIME_PER_PAGE from "@/lib/models";
 import { useAuth } from "../../context/AuthContext";
@@ -37,6 +36,7 @@ export default function Home() {
   const { user, isLoading } = useAuth();
   const { safeFetch, serverError, setServerError } = useSafeFetch();
   const { templates } = usePromptTemplates();
+  const isInternalUser = user?.role === "internal";
 
     useEffect(() => {
         if (isLoading) {
@@ -70,6 +70,38 @@ export default function Home() {
         }
     };
 
+  const beginAcceptedProcess = async (quote) => {
+    if (!quote?.processId) return false;
+
+    const response = await safeFetch(
+      `${BACK_HOST}/api/processes/${quote.processId}/accept`,
+      {
+        method: "POST",
+        credentials: "include",
+      },
+    );
+
+    if (!response || !response.ok) {
+      setServerError(true);
+      return false;
+    }
+
+    const data = await response.json();
+    if (data?.paymentUrl) {
+      router.push(data.paymentUrl);
+      return true;
+    }
+
+    const timePerPage = ESTIMATED_TIME_PER_PAGE[adapter] || 1.5;
+    const estimatedTime = timePerPage * (quote.pages || 50);
+    localStorage.setItem(
+      `process_${quote.processId}_estimated_time`,
+      estimatedTime,
+    );
+    router.push(`/${quote.processId}`);
+    return true;
+  };
+
   const handleUpload = async () => {
     if (!file) return;
 
@@ -94,64 +126,49 @@ export default function Home() {
     formData.append("customDocumentType", documentTypeLabel);
 
     try {
-            const response = await safeFetch(`${BACK_HOST}/api/process-document`, {
-                method: "POST",
-                body: formData,
-                credentials: "include",
-            });
+      const response = await safeFetch(`${BACK_HOST}/api/process-document`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
 
-            if (!response) {
-                setServerError(true);
-                return;
-            }
-
-            if (response.status === 401 || response.status === 403) {
-                window.location.href = `${FRONT_HOST}/`;
-                return;
-            }
-            if (!response.ok) {
-                setServerError(true);
-                setIsUploading(false);
-                return;
-            }
-
-            const data = await response.json();
-            setQuoteData(data);
-            setShowQuoteModal(true);
-            setIsUploading(false);
-        } catch (error) {
-            console.error("Error uploading document:", error);
-            setIsUploading(false);
-        }
-    };
-
-    const handleAcceptQuote = async () => {
-    if (!quoteData?.processId) return;
-    setIsAcceptingQuote(true);
-    try {
-      const response = await safeFetch(
-        `${BACK_HOST}/api/processes/${quoteData.processId}/accept`,
-        {
-          method: "POST",
-          credentials: "include",
-        },
-      );
-      if (!response || !response.ok) {
+      if (!response) {
         setServerError(true);
         return;
       }
+
+      if (response.status === 401 || response.status === 403) {
+        window.location.href = `${FRONT_HOST}/`;
+        return;
+      }
+      if (!response.ok) {
+        setServerError(true);
+        return;
+      }
+
       const data = await response.json();
-      setShowQuoteModal(false);
-      if (data?.paymentUrl) {
-        router.push(data.paymentUrl);
-      } else {
-        const timePerPage = ESTIMATED_TIME_PER_PAGE[adapter] || 1.5;
-        const estimatedTime = timePerPage * (quoteData.pages || 50);
-        localStorage.setItem(
-          `process_${quoteData.processId}_estimated_time`,
-          estimatedTime,
-        );
-        router.push(`/${quoteData.processId}`);
+
+      if (isInternalUser) {
+        await beginAcceptedProcess(data);
+        return;
+      }
+
+      setQuoteData(data);
+      setShowQuoteModal(true);
+    } catch (error) {
+      console.error("Error uploading document:", error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleAcceptQuote = async () => {
+    if (!quoteData?.processId) return;
+    setIsAcceptingQuote(true);
+    try {
+      const started = await beginAcceptedProcess(quoteData);
+      if (started) {
+        setShowQuoteModal(false);
       }
     } catch (error) {
       console.error("Error accepting quote:", error);
